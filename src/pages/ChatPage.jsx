@@ -1,23 +1,30 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import io from 'socket.io-client';
 
-const socket = io('http://localhost:5000'); // or your backend URL
-
 const ChatPage = () => {
-  const { rideId } = useParams(); // this is the roomId
+  const { rideId } = useParams();
   const [message, setMessage] = useState('');
   const [chat, setChat] = useState([]);
+  const socketRef = useRef(null);
 
   useEffect(() => {
-    socket.emit('join_room', rideId);
+    // Connect socket
+    socketRef.current = io('http://localhost:5000'); // Use your backend URL
 
-    socket.on('receive_message', (data) => {
+    // Join the room
+    socketRef.current.emit('join_room', rideId);
+
+    // Listen for incoming messages
+    socketRef.current.on('receive_message', (data) => {
       setChat((prev) => [...prev, data]);
     });
 
+    // Cleanup on unmount
     return () => {
-      socket.disconnect();
+      socketRef.current.emit('leave_room', rideId); // Optional if you handle it in backend
+      socketRef.current.off('receive_message'); // Remove event listener
+      socketRef.current.disconnect(); // Close connection
     };
   }, [rideId]);
 
@@ -26,12 +33,12 @@ const ChatPage = () => {
 
     const msgData = {
       room: rideId,
-      sender: 'You', // replace with current user
+      sender: 'You', // TODO: Replace with logged-in user’s name or ID
       message,
       timestamp: new Date().toLocaleTimeString()
     };
 
-    socket.emit('send_message', msgData);
+    socketRef.current.emit('send_message', msgData);
     setChat((prev) => [...prev, msgData]);
     setMessage('');
   };
@@ -42,7 +49,8 @@ const ChatPage = () => {
       <div className="border h-64 overflow-y-scroll mb-4 p-2 bg-gray-100 rounded">
         {chat.map((msg, idx) => (
           <div key={idx} className="mb-1">
-            <strong>{msg.sender}:</strong> {msg.message} <span className="text-xs text-gray-500">({msg.timestamp})</span>
+            <strong>{msg.sender}:</strong> {msg.message}{' '}
+            <span className="text-xs text-gray-500">({msg.timestamp})</span>
           </div>
         ))}
       </div>

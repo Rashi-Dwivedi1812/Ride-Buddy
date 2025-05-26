@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from '../api/axios';
 
 const ImageUploader = ({ onUpload }) => {
@@ -13,7 +13,7 @@ const ImageUploader = ({ onUpload }) => {
         setError('Only JPEG, PNG, or GIF images are allowed');
         return;
       }
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         setError('Image size must be less than 5MB');
         return;
       }
@@ -31,13 +31,19 @@ const ImageUploader = ({ onUpload }) => {
     const formData = new FormData();
     formData.append('image', image);
     try {
-      const res = await axios.post('/upload', formData);
+      const res = await axios.post('/api/upload', formData); // corrected URL
       onUpload(res.data.imageUrl);
       setError('');
     } catch (err) {
       setError(err.response?.data?.msg || 'Failed to upload image');
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
 
   return (
     <div className="mb-4">
@@ -51,7 +57,8 @@ const ImageUploader = ({ onUpload }) => {
       {error && <p className="text-red-500">{error}</p>}
       <button
         onClick={handleUpload}
-        className="bg-blue-500 text-white px-4 py-2 rounded mt-2"
+        disabled={!image}
+        className="bg-blue-500 text-white px-4 py-2 rounded mt-2 disabled:opacity-50"
       >
         Upload Screenshot
       </button>
