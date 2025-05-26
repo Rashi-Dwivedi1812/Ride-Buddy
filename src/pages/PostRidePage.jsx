@@ -16,41 +16,45 @@ const PostRidePage = () => {
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  e.preventDefault();
+  setError('');
 
-    if (!form.from || !form.to) {
-      return setError('From and To fields are required');
-    }
-    if (!form.departureTime || new Date(form.departureTime) <= new Date()) {
-      return setError('Departure time must be in the future');
-    }
-    if (!form.seatsAvailable || form.seatsAvailable <= 0) {
-      return setError('Seats available must be positive');
-    }
-    if (!form.costPerPerson || form.costPerPerson <= 0) {
-      return setError('Cost per person must be positive');
-    }
+  if (!form.from || !form.to) {
+    return setError('From and To fields are required');
+  }
+  if (!form.departureTime || new Date(form.departureTime) <= new Date()) {
+    return setError('Departure time must be in the future');
+  }
+  if (!form.seatsAvailable || Number(form.seatsAvailable) <= 0) {
+    return setError('Seats available must be positive');
+  }
+  if (!form.costPerPerson || Number(form.costPerPerson) <= 0) {
+    return setError('Cost per person must be positive');
+  }
 
-    try {
-      const res = await api.post('/rides', {
-        ...form,
-        seatsAvailable: Number(form.seatsAvailable),
-        costPerPerson: Number(form.costPerPerson),
-      });
-      alert('Ride posted successfully!');
-      setForm({
-        from: '',
-        to: '',
-        departureTime: '',
-        seatsAvailable: '',
-        costPerPerson: '',
-        cabScreenshotUrl: '',
-      });
-    } catch (err) {
-      setError(err.response?.data?.msg || 'Error posting ride');
-    }
-  };
+  // Optional: Require image
+  // if (!form.cabScreenshotUrl) return setError('Cab screenshot is required');
+
+  try {
+    const res = await api.post('/rides', {
+      ...form,
+      seatsAvailable: Number(form.seatsAvailable),
+      costPerPerson: Number(form.costPerPerson),
+    });
+    alert('Ride posted successfully!');
+    setForm({
+      from: '',
+      to: '',
+      departureTime: '',
+      seatsAvailable: '',
+      costPerPerson: '',
+      cabScreenshotUrl: '',
+    });
+  } catch (err) {
+    setError(err.response?.data?.msg || 'Error posting ride');
+  }
+};
+
 
   return (
     <div className="flex justify-center py-10 bg-gray-100">
