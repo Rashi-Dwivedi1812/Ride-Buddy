@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ImageUploader from '../components/imageUploader';
-import api from '../api/axios';
+
+import axios from 'axios';
 
 const PostRidePage = () => {
   const [form, setForm] = useState({

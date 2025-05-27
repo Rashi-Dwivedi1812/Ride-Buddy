@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../api/axios'; // Make sure this path is correct
+
+import axios from 'axios'; // Make sure this path is correct
 
 const RideDetailPage = () => {
   const { id } = useParams();

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import api from '../api/axios'; // Adjust path if needed
+
+import axios from 'axios'; // Adjust path if needed
 
 const FindRidePage = () => {
   const [rides, setRides] = useState([]);

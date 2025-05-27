@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from '../api/axios';
 
+import axios from 'axios';
 const ImageUploader = ({ onUpload }) => {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState('');

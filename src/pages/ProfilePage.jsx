@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api/axios';
+
+import axios from 'axios';
 
 const ProfilePage = () => {
   const [postedRides, setPostedRides] = useState([]);
