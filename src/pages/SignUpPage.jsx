@@ -27,6 +27,7 @@ const SignUpPage = () => {
 
     try {
       const res = await axios.post('/auth/register', {
+
         name: form.name,
         email: form.email,
         password: form.password
