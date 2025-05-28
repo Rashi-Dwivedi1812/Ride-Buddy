@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import Ride from '../models/Ride.js';
+import auth from '../middleware/authMiddleware.js';
+
 const router = express.Router();
-const Ride = require('../models/Ride');
-const auth = require('../middleware/authMiddleware');
 
 // POST /api/rides - create a new ride
 router.post('/', auth, async (req, res) => {
@@ -27,14 +28,17 @@ router.post('/', auth, async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { sortBy, seats } = req.query;
-    let query = {};
+    const query = {};
 
     if (seats) query.seatsAvailable = { $gte: parseInt(seats) };
 
-    let rides = await Ride.find(query).populate('driver', 'name email');
+    const sortOption = {};
+    if (sortBy === 'cost') sortOption.costPerPerson = 1;
+    else if (sortBy === 'time') sortOption.departureTime = 1;
 
-    if (sortBy === 'cost') rides = rides.sort((a, b) => a.costPerPerson - b.costPerPerson);
-    else if (sortBy === 'time') rides = rides.sort((a, b) => new Date(a.departureTime) - new Date(b.departureTime));
+    const rides = await Ride.find(query)
+      .populate('driver', 'name email')
+      .sort(sortOption);
 
     res.json(rides);
   } catch (err) {
@@ -72,9 +76,5 @@ router.post('/:id/book', auth, async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 });
-let sortOption = {};
-if (sortBy === 'cost') sortOption.costPerPerson = 1;
-else if (sortBy === 'time') sortOption.departureTime = 1;
-let rides = await Ride.find(query).populate('driver', 'name email').sort(sortOption);
 
-module.exports = router;
+export default router;

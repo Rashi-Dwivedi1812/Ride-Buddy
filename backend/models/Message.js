@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const MessageSchema = new mongoose.Schema({
   ride: { type: mongoose.Schema.Types.ObjectId, ref: 'Ride', required: true },
@@ -10,4 +10,5 @@ const MessageSchema = new mongoose.Schema({
 // Add index on ride and timestamp for efficient querying and sorting
 MessageSchema.index({ ride: 1, timestamp: 1 });
 
-module.exports = mongoose.model('Message', MessageSchema);
+const Message = mongoose.model('Message', MessageSchema);
+export default Message;

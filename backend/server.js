@@ -9,8 +9,6 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import rideRoutes from './routes/rideRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
-import uploadRoutes from './routes/uploadRoutes.js';
-import messageRoutes from './routes/messageRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -48,8 +46,6 @@ const startServer = async () => {
     app.use('/api/auth', authRoutes);
     app.use('/api/rides', rideRoutes);
     app.use('/api/chat', chatRoutes);
-    app.use('/api/upload', uploadRoutes);
-    app.use('/api/messages', messageRoutes);
 
     // Socket.IO setup
     const io = new Server(server, { 

@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import auth from '../middleware/authMiddleware.js';
+import Message from '../models/Message.js';
+
 const router = express.Router();
-const auth = require('../middleware/authMiddleware');
-const Message = require('../models/Message');
 
 // Get chat messages for a ride
 router.get('/:rideId', auth, async (req, res) => {
@@ -9,8 +10,9 @@ router.get('/:rideId', auth, async (req, res) => {
     const messages = await Message.find({ ride: req.params.rideId }).populate('sender', 'name');
     res.json(messages);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
 
-module.exports = router;
+export default router;

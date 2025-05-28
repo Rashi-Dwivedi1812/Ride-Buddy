@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const RideSchema = new mongoose.Schema({
   driver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -43,7 +43,6 @@ RideSchema.pre('save', function(next) {
   if (this.seatsAvailable < 0) {
     return next(new Error('Seats available cannot be negative'));
   }
-  // Optional: Ensure bookedBy length doesn't exceed initial seats
   const initialSeats = this.isNew ? this.seatsAvailable : this._initialSeatsAvailable;
   if (this.bookedBy.length > initialSeats) {
     return next(new Error('Number of booked users cannot exceed initial seats available'));
@@ -59,4 +58,5 @@ RideSchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('Ride', RideSchema);
+const Ride = mongoose.model('Ride', RideSchema);
+export default Ride;
