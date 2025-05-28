@@ -18,17 +18,17 @@ function validateAuthInput({ name, email, password }) {
 // @route   POST /api/auth/register
 // @desc    Register a new user
 router.post('/register', async (req, res) => {
-  // Only pick allowed fields
   const { name, email, password } = req.body;
 
-  // Validate input
   if (!validateAuthInput({ name, email, password })) {
     return res.status(400).json({ msg: 'Invalid input' });
   }
 
   try {
-    // Use strict query with validated email
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Use parameterized query execution (`exec()`)
+    const user = await User.findOne({ email: normalizedEmail }).exec();
     if (user) return res.status(400).json({ msg: 'User already exists' });
 
     const salt = await bcrypt.genSalt(10);
@@ -36,9 +36,10 @@ router.post('/register', async (req, res) => {
 
     const newUser = new User({
       name: name.trim(),
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       password: hashedPassword
     });
+
     await newUser.save();
 
     const token = jwt.sign({ id: newUser._id }, JWT_SECRET, { expiresIn: '1d' });
@@ -52,17 +53,17 @@ router.post('/register', async (req, res) => {
 // @route   POST /api/auth/login
 // @desc    Login user and get token
 router.post('/login', async (req, res) => {
-  // Only pick allowed fields
   const { email, password } = req.body;
 
-  // Validate input
   if (!validateAuthInput({ email, password })) {
     return res.status(400).json({ msg: 'Invalid input' });
   }
 
   try {
-    // Use strict query with validated email
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Use parameterized query execution (`exec()`)
+    const user = await User.findOne({ email: normalizedEmail }).exec();
     if (!user) return res.status(400).json({ msg: 'Invalid credentials' });
 
     const isMatch = await bcrypt.compare(password, user.password);
