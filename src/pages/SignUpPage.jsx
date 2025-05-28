@@ -26,7 +26,7 @@ const SignUpPage = () => {
     }
 
     try {
-      const res = await axios.post('/auth/register', {
+      const res = await axios.post('http://localhost:5000/api/auth/register', {
 
         name: form.name,
         email: form.email,

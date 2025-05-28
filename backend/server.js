@@ -4,18 +4,19 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
+import path from 'path';
 
 // Route Imports
 import authRoutes from './routes/authRoutes.js';
 import rideRoutes from './routes/rideRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
 
 // Load environment variables
 dotenv.config();
 
-// Validate environment variables FIRST
-const requiredEnv = ['MONGO_URI', 'JWT_SECRET', 'CLOUDINARY_CLOUD_NAME', 
-                    'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
+// Validate required env vars
+const requiredEnv = ['MONGO_URI', 'JWT_SECRET'];
 requiredEnv.forEach((env) => {
   if (!process.env[env]) {
     console.error(`Missing environment variable: ${env}`);
@@ -23,37 +24,43 @@ requiredEnv.forEach((env) => {
   }
 });
 
-// CORS configuration
-const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5000'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE']
-};
+// Default to localhost:5173 if ALLOWED_ORIGINS not set
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173']; // ✅ frontend dev port
 
-// App and server setup
+// Express setup
 const app = express();
 const server = http.createServer(app);
 
 // Middleware
-app.use(cors(corsOptions));
-app.use(express.json());
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true, // This tells the browser to allow cookies/auth headers
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 
-// Database connection
+app.use(express.json());
+app.use('/api/upload', uploadRoutes);
+app.use('/uploads', express.static(path.resolve('uploads')));
+
+// Connect to DB and start server
 const startServer = async () => {
   try {
     await connectDB();
-    
+
     // Routes
     app.use('/api/auth', authRoutes);
     app.use('/api/rides', rideRoutes);
     app.use('/api/chat', chatRoutes);
 
-    // Socket.IO setup
-    const io = new Server(server, { 
+    // Socket.io setup
+    const io = new Server(server, {
       cors: corsOptions,
       connectionStateRecovery: {
         maxDisconnectionDuration: 2 * 60 * 1000,
-        skipMiddlewares: true
-      }
+        skipMiddlewares: true,
+      },
     });
 
     io.on('connection', (socket) => {
@@ -87,15 +94,14 @@ const startServer = async () => {
     // Start server
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Allowed origins: ${corsOptions.origin}`);
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🌐 Allowed origins: ${allowedOrigins.join(', ')}`);
     });
-
   } catch (error) {
-    console.error('Server startup failed:', error);
+    console.error('❌ Server startup failed:', error);
     process.exit(1);
   }
 };
 
-// Start application
+// Launch app
 startServer();

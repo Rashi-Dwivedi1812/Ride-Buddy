@@ -8,7 +8,7 @@ const PostRidePage = () => {
     from: '',
     to: '',
     departureTime: '',
-    seatsAvailable: '',
+    seatsAvailable: '', 
     costPerPerson: '',
     cabScreenshotUrl: '',
   });
@@ -37,11 +37,19 @@ const PostRidePage = () => {
   // if (!form.cabScreenshotUrl) return setError('Cab screenshot is required');
 
   try {
-    const res = await api.post('/rides', {
-      ...form,
-      seatsAvailable: Number(form.seatsAvailable),
-      costPerPerson: Number(form.costPerPerson),
-    });
+    const token = localStorage.getItem('token'); // ✅ get token
+    const res = await axios.post('http://localhost:5000/api/rides' ,
+      {
+        ...form,
+        seatsAvailable: Number(form.seatsAvailable),
+        costPerPerson: Number(form.costPerPerson),
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`, // ✅ attach token here
+        },
+      }
+    );
     alert('Ride posted successfully!');
     setForm({
       from: '',
@@ -53,6 +61,7 @@ const PostRidePage = () => {
     });
   } catch (err) {
     setError(err.response?.data?.msg || 'Error posting ride');
+    console.error('Ride post error:', err);
   }
 };
 
