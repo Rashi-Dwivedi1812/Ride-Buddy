@@ -6,20 +6,29 @@ const router = express.Router();
 
 // POST /api/rides - create a new ride
 router.post('/', auth, async (req, res) => {
-  const { from, to, departureTime, seatsAvailable, costPerPerson, cabScreenshotUrl } = req.body;
+  const { from, to, date, driverArrivingIn, seatsAvailable, costPerPerson, cabScreenshotUrl } = req.body;
+
+  // Basic validation
+  if (!from || !to || !date || !driverArrivingIn || !seatsAvailable || !costPerPerson) {
+    return res.status(400).json({ msg: 'Missing required fields' });
+  }
+
   try {
     const newRide = new Ride({
       driver: req.user,
       from,
       to,
-      departureTime,
+      date,
+      driverArrivingIn,
       seatsAvailable,
       costPerPerson,
       cabScreenshotUrl,
     });
+
     const savedRide = await newRide.save();
     res.json(savedRide);
   } catch (err) {
+    console.error('Error creating ride:', err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
@@ -34,7 +43,7 @@ router.get('/', async (req, res) => {
 
     const sortOption = {};
     if (sortBy === 'cost') sortOption.costPerPerson = 1;
-    else if (sortBy === 'time') sortOption.departureTime = 1;
+    else if (sortBy === 'date') sortOption.date = 1;
 
     const rides = await Ride.find(query)
       .populate('driver', 'name email')
@@ -76,5 +85,21 @@ router.post('/:id/book', auth, async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 });
+
+// POST /api/rides/:id/reject - reject a ride
+router.post('/:id/reject', auth, async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.id);
+    if (!ride) return res.status(404).json({ msg: 'Ride not found' });
+
+    // Optional: do something like marking it as rejected or logging it
+
+    res.json({ msg: 'Ride rejected' });
+  } catch (err) {
+    console.error('Error rejecting ride:', err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+});
+
 
 export default router;

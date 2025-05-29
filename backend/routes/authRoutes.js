@@ -81,7 +81,9 @@ router.post('/register', async (req, res) => {
     await newUser.save();
 
     const token = jwt.sign({ id: newUser._id }, JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token });
+console.log('🔐 Signing with JWT_SECRET:', JWT_SECRET);
+res.json({ token });
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -104,7 +106,9 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ msg: 'Invalid credentials' });
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token });
+console.log('🔐 Signing with JWT_SECRET:', JWT_SECRET);
+res.json({ token });
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');

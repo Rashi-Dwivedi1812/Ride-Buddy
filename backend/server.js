@@ -1,10 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import path from 'path';
+// Load environment variables
+
 
 // Route Imports
 import authRoutes from './routes/authRoutes.js';
@@ -12,8 +15,7 @@ import rideRoutes from './routes/rideRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 
-// Load environment variables
-dotenv.config();
+
 
 // Validate required env vars
 const requiredEnv = ['MONGO_URI', 'JWT_SECRET'];
@@ -24,6 +26,8 @@ requiredEnv.forEach((env) => {
   }
 });
 
+
+
 // Default to localhost:5173 if ALLOWED_ORIGINS not set
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
@@ -33,6 +37,11 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 const app = express();
 const server = http.createServer(app);
 
+const corsOptions = {
+  origin: allowedOrigins,
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
 // Middleware
 app.use(cors({
   origin: 'http://localhost:5173',
