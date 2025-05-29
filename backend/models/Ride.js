@@ -50,8 +50,7 @@ const RideSchema = new mongoose.Schema({
   cabScreenshotUrl: { type: String },
   createdAt: {
     type: Date,
-    default: Date.now,
-    expires: 600 // 600 seconds = 10 minutes
+    default: Date.now
   },
 
   bookedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

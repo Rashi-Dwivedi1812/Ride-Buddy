@@ -1,3 +1,6 @@
+// ✅ Fix to display uploaded cabScreenshotUrl properly in React
+// 🔧 Ensure full URL is used for images (relative path alone won’t work in browser)
+
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -23,30 +26,28 @@ const FindRidePage = () => {
   };
 
   const handleReject = async (rideId) => {
-  try {
-    const token = localStorage.getItem('token');
-    await axios.post(
-      `http://localhost:5000/api/rides/${rideId}/reject`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `http://localhost:5000/api/rides/${rideId}/reject`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-    alert('🚫 Ride rejected.');
-    setRides((prevRides) => prevRides.filter((ride) => ride._id !== rideId));
-  } catch (error) {
-    console.error('Error rejecting ride:', error.response?.data || error.message);
-    alert('❌ Failed to reject ride.');
-  }
-};
+      alert('🚫 Ride rejected.');
+      setRides((prevRides) => prevRides.filter((ride) => ride._id !== rideId));
+    } catch (error) {
+      console.error('Error rejecting ride:', error.response?.data || error.message);
+      alert('❌ Failed to reject ride.');
+    }
+  };
 
-
-
-  const handleChat = (driverId) => {
-    navigate(`/chat/${driverId}`);
+  const handleChat = (rideId) => {
+    navigate(`/chat/${rideId}`);
   };
 
   return (
@@ -58,13 +59,17 @@ const FindRidePage = () => {
         ) : (
           rides.map((ride) => (
             <div key={ride._id} className="bg-white p-4 rounded shadow flex gap-4 items-start">
-              {ride.driver?.photo && (
-                <img
-                  src={ride.driver.photo}
-                  alt={`${ride.driver.name}'s profile`}
-                  className="w-20 h-20 object-cover rounded-full border"
-                />
-              )}
+              {/* ✅ Use full URL if only relative path is stored */}
+              {ride.cabScreenshotUrl && (
+  <a href={ride.cabScreenshotUrl} target="_blank" rel="noopener noreferrer">
+    <img
+      src={ride.cabScreenshotUrl}
+      alt="Cab Screenshot"
+      className="w-24 h-24 object-cover rounded mb-2"
+    />
+  </a>
+)}
+
               <div className="flex-1">
                 <p><strong>Name:</strong> {ride.driver?.name}</p>
                 <p><strong>From:</strong> {ride.from}</p>
@@ -73,6 +78,7 @@ const FindRidePage = () => {
                 <p><strong>Driver arriving in:</strong> {ride.driverArrivingIn}</p>
                 <p><strong>Cost per person:</strong> ₹{ride.costPerPerson}</p>
                 <p><strong>Seats Available:</strong> {ride.seatsAvailable}</p>
+
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={() => handleAccept(ride._id)}
@@ -87,7 +93,7 @@ const FindRidePage = () => {
                     Reject
                   </button>
                   <button
-                    onClick={() => handleChat(ride.driver?._id)}
+                    onClick={() => handleChat(ride._id)}
                     className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded"
                   >
                     Chat

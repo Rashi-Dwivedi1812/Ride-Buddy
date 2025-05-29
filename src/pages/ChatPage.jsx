@@ -1,29 +1,47 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import io from 'socket.io-client';
+import axios from 'axios';
 
 const ChatPage = () => {
-  const { userId } = useParams(); // Or rideId if you're using that
+  const { rideId } = useParams();
   const [message, setMessage] = useState('');
   const [chat, setChat] = useState([]);
+  const [rideOwnerName, setRideOwnerName] = useState('');
   const socketRef = useRef(null);
   const chatEndRef = useRef(null);
 
-  useEffect(() => {
-    socketRef.current = io('http://localhost:5000'); // Update with your server
+  const currentUser = JSON.parse(localStorage.getItem('user'));
+  const currentUserId = currentUser?._id;
 
-    socketRef.current.emit('join_room', userId);
+  useEffect(() => {
+    const fetchRideDetails = async () => {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/rides/${rideId}`);
+        setRideOwnerName(res.data.driver?.name || 'User');
+      } catch (err) {
+        console.error('Failed to fetch ride details:', err);
+        setRideOwnerName('User');
+      }
+    };
+
+    fetchRideDetails();
+  }, [rideId]);
+
+  useEffect(() => {
+    socketRef.current = io('http://localhost:5000');
+    socketRef.current.emit('join_room', rideId);
 
     socketRef.current.on('receive_message', (data) => {
       setChat((prev) => [...prev, data]);
     });
 
     return () => {
-      socketRef.current.emit('leave_room', userId);
+      socketRef.current.emit('leave_room', rideId);
       socketRef.current.off('receive_message');
       socketRef.current.disconnect();
     };
-  }, [userId]);
+  }, [rideId]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,27 +51,38 @@ const ChatPage = () => {
     if (message.trim() === '') return;
 
     const msgData = {
-      room: userId,
-      sender: 'You', // Replace with actual user name/ID if available
+      room: rideId,
+      sender: currentUserId,
       message,
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: new Date().toISOString(),
     };
 
     socketRef.current.emit('send_message', msgData);
-    setChat((prev) => [...prev, msgData]);
+
+    // Show message optimistically
+    setChat((prev) => [...prev, {
+      ...msgData,
+      sender: { _id: currentUserId, name: 'You' }
+    }]);
+
     setMessage('');
   };
 
   return (
     <div className="p-4">
-      <h2 className="text-xl font-semibold mb-2">Chat with User: {userId}</h2>
+      <h2 className="text-xl font-semibold mb-2">Chat with {rideOwnerName}:</h2>
       <div className="border h-64 overflow-y-scroll mb-4 p-2 bg-gray-100 rounded">
-        {chat.map((msg, idx) => (
-          <div key={idx} className="mb-1">
-            <strong>{msg.sender}:</strong> {msg.message}{' '}
-            <span className="text-xs text-gray-500">({msg.timestamp})</span>
-          </div>
-        ))}
+        {chat.map((msg, idx) => {
+          const senderName = msg.sender._id === currentUserId ? 'You' : msg.sender.name;
+          return (
+            <div key={idx} className="mb-1">
+              <strong>{senderName}:</strong> {msg.message}{' '}
+              <span className="text-xs text-gray-500">
+                ({new Date(msg.timestamp).toLocaleTimeString()})
+              </span>
+            </div>
+          );
+        })}
         <div ref={chatEndRef} />
       </div>
 

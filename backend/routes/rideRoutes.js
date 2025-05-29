@@ -58,7 +58,7 @@ router.get('/', async (req, res) => {
 // GET /api/rides/:id - get ride detail
 router.get('/:id', async (req, res) => {
   try {
-    const ride = await Ride.findById(req.params.id).populate('driver', 'name email');
+    const ride = await Ride.findById(req.params.id).populate('driver', 'name');
     if (!ride) return res.status(404).json({ msg: 'Ride not found' });
     res.json(ride);
   } catch (err) {

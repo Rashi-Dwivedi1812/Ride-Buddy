@@ -1,66 +1,55 @@
-import React, { useState, useEffect } from 'react';
-
+import { useState } from 'react';
 import axios from 'axios';
+
 const ImageUploader = ({ onUpload }) => {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState('');
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
-        setError('Only JPEG, PNG, or GIF images are allowed');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Image size must be less than 5MB');
-        return;
-      }
-      setImage(file);
-      setPreview(URL.createObjectURL(file));
-      setError('');
-    }
+    if (!file) return;
+
+    setImage(file);
+    setPreview(URL.createObjectURL(file));
+    setError('');
   };
 
   const handleUpload = async () => {
-    if (!image) {
-      setError('Please select an image');
-      return;
-    }
+    if (!image) return setError('Please select an image');
+
     const formData = new FormData();
-    formData.append('image', image);
+    formData.append('file', image);
+    formData.append('upload_preset', 'post_ride_upload'); // your unsigned preset
+
+    setUploading(true);
     try {
-      const res = await axios.post('/api/upload', formData); // corrected URL
-      onUpload(res.data.imageUrl);
+      const res = await axios.post(
+        'https://api.cloudinary.com/v1_1/dqh2wytcb/image/upload',
+        formData
+      );
+      onUpload(res.data.secure_url); // Send the URL to the parent
       setError('');
     } catch (err) {
-      setError(err.response?.data?.msg || 'Failed to upload image');
+      console.error('Upload failed:', err);
+      setError('Upload failed');
+    } finally {
+      setUploading(false);
     }
   };
 
-  useEffect(() => {
-    return () => {
-      if (preview) URL.revokeObjectURL(preview);
-    };
-  }, [preview]);
-
   return (
     <div className="mb-4">
-      <input
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        className="border rounded p-2 w-full"
-      />
+      <input type="file" accept="image/*" onChange={handleFileChange} />
       {preview && <img src={preview} alt="Preview" className="h-24 my-2 rounded" />}
       {error && <p className="text-red-500">{error}</p>}
       <button
         onClick={handleUpload}
-        disabled={!image}
-        className="bg-blue-500 text-white px-4 py-2 rounded mt-2 disabled:opacity-50"
+        disabled={!image || uploading}
+        className="bg-blue-500 text-white px-4 py-2 rounded mt-2"
       >
-        Upload Screenshot
+        {uploading ? 'Uploading...' : 'Upload Screenshot'}
       </button>
     </div>
   );
