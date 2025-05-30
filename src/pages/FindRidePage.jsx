@@ -1,28 +1,50 @@
-// ✅ Fix to display uploaded cabScreenshotUrl properly in React
-// 🔧 Ensure full URL is used for images (relative path alone won’t work in browser)
-
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import io from 'socket.io-client';
 
 const FindRidePage = () => {
   const [rides, setRides] = useState([]);
+  const socketRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     axios.get('http://localhost:5000/api/rides')
       .then((res) => setRides(res.data))
       .catch((err) => console.error('Error fetching rides:', err));
+
+    // Initialize socket
+    socketRef.current = io('http://localhost:5000');
+
+    return () => {
+      socketRef.current.disconnect();
+    };
   }, []);
 
   const handleAccept = async (rideId) => {
     try {
-      await axios.post(`http://localhost:5000/api/rides/${rideId}/accept`);
-      alert('✅ Ride accepted!');
-    } catch (error) {
-      console.error('Error accepting ride:', error);
-      alert('❌ Failed to accept ride.');
-    }
+      const token = localStorage.getItem('token');
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const userId = payload.id;
+      const userName = payload.name;
+
+      await axios.post(`http://localhost:5000/api/rides/${rideId}/accept`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // ✅ Notify ride owner via socket
+      socketRef.current.emit('ride_booked', {
+        rideId,
+        byUserId: userId,
+        message: `${userName || 'Someone'} accepted your ride.`,
+      });
+
+      // ✅ Redirect to /current-ride
+      navigate(`/current-ride/${rideId}`);
+  } catch (error) {
+    console.error('Error accepting ride:', error);
+    alert('❌ Failed to accept ride.');
+  }
   };
 
   const handleReject = async (rideId) => {
@@ -31,13 +53,8 @@ const FindRidePage = () => {
       await axios.post(
         `http://localhost:5000/api/rides/${rideId}/reject`,
         {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
       alert('🚫 Ride rejected.');
       setRides((prevRides) => prevRides.filter((ride) => ride._id !== rideId));
     } catch (error) {
@@ -59,17 +76,15 @@ const FindRidePage = () => {
         ) : (
           rides.map((ride) => (
             <div key={ride._id} className="bg-white p-4 rounded shadow flex gap-4 items-start">
-              {/* ✅ Use full URL if only relative path is stored */}
               {ride.cabScreenshotUrl && (
-  <a href={ride.cabScreenshotUrl} target="_blank" rel="noopener noreferrer">
-    <img
-      src={ride.cabScreenshotUrl}
-      alt="Cab Screenshot"
-      className="w-24 h-24 object-cover rounded mb-2"
-    />
-  </a>
-)}
-
+                <a href={ride.cabScreenshotUrl} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={ride.cabScreenshotUrl}
+                    alt="Cab Screenshot"
+                    className="w-24 h-24 object-cover rounded mb-2"
+                  />
+                </a>
+              )}
               <div className="flex-1">
                 <p><strong>Name:</strong> {ride.driver?.name}</p>
                 <p><strong>From:</strong> {ride.from}</p>

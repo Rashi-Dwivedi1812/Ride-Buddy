@@ -6,16 +6,13 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import connectDB from './config/db.js';
 import path from 'path';
-// Load environment variables
-
 
 // Route Imports
 import authRoutes from './routes/authRoutes.js';
 import rideRoutes from './routes/rideRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
-
-
+import Message from './models/Message.js'; // Needed for saving chat messages
 
 // Validate required env vars
 const requiredEnv = ['MONGO_URI', 'JWT_SECRET'];
@@ -25,8 +22,6 @@ requiredEnv.forEach((env) => {
     process.exit(1);
   }
 });
-
-
 
 // Default to localhost:5173 if ALLOWED_ORIGINS not set
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -42,13 +37,13 @@ const corsOptions = {
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
+
 // Middleware
 app.use(cors({
   origin: 'http://localhost:5173',
-  credentials: true, // This tells the browser to allow cookies/auth headers
+  credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-
 app.use(express.json());
 app.use('/api/upload', uploadRoutes);
 app.use('/uploads', express.static(path.resolve('uploads')));
@@ -72,6 +67,8 @@ const startServer = async () => {
       },
     });
 
+    app.set('io', io); // For controllers that need access to io
+
     io.on('connection', (socket) => {
       console.log(`⚡ New client connected: ${socket.id}`);
 
@@ -93,6 +90,16 @@ const startServer = async () => {
           console.error('Error saving message:', err);
           socket.emit('message_error', { error: err.message });
         }
+      });
+
+      // ✅ NEW: Ride Booked Notification
+      socket.on('ride_booked', ({ rideId, byUserId, message }) => {
+        console.log(`📣 Ride booked: ${rideId} by ${byUserId}`);
+        io.to(rideId).emit('ride_booked', {
+          rideId,
+          byUserId,
+          message: message || 'Your ride was booked!',
+        });
       });
 
       socket.on('disconnect', () => {

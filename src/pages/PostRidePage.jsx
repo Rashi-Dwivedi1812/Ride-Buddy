@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import ImageUploader from '../components/imageUploader';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const PostRidePage = () => {
   const [form, setForm] = useState({
@@ -13,6 +16,7 @@ const PostRidePage = () => {
     cabScreenshotUrl: '',
   });
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -21,6 +25,7 @@ const PostRidePage = () => {
     e.preventDefault();
     setError('');
 
+    // Validation
     if (!form.from || !form.to) {
       return setError('From and To fields are required');
     }
@@ -57,16 +62,8 @@ const PostRidePage = () => {
         }
       );
 
-      alert('Ride posted successfully!');
-      setForm({
-        from: '',
-        to: '',
-        date: '',
-        driverArrivingIn: '',
-        seatsAvailable: '',
-        costPerPerson: '',
-        cabScreenshotUrl: '',
-      });
+      toast.success('Ride posted successfully!');
+      navigate('/my-rides');
     } catch (err) {
       setError(err.response?.data?.msg || 'Error posting ride');
       console.error('Ride post error:', err);
