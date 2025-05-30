@@ -5,22 +5,46 @@ import { toast } from 'react-toastify';
 
 const MyRidesPage = () => {
   const [rides, setRides] = useState([]);
+  const [countdowns, setCountdowns] = useState({});
   const socketRef = useRef(null);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
+  };
+
+  const calculateCountdown = (ride) => {
+    const createdAt = new Date(ride.createdAt).getTime();
+    const arrivingInSeconds = ride.driverArrivingIn * 60;
+    const serverTarget = createdAt + arrivingInSeconds * 1000;
+    const now = Date.now();
+    const diffSeconds = Math.floor((serverTarget - now) / 1000);
+    return diffSeconds > 0 ? diffSeconds : 0;
+  };
 
   const fetchMyRides = async () => {
     try {
       const token = localStorage.getItem('token');
       const res = await axios.get('http://localhost:5000/api/rides', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
+
       setRides(res.data);
 
-      // Join ride rooms
       res.data.forEach((ride) => {
         socketRef.current.emit('join_room', ride._id);
       });
+
+      const initialCountdowns = {};
+      res.data.forEach((ride) => {
+        if (!ride.bookedBy || ride.bookedBy.length === 0) {
+          const timeLeft = calculateCountdown(ride);
+          initialCountdowns[ride._id] = timeLeft;
+        }
+      });
+
+      setCountdowns(initialCountdowns);
     } catch (err) {
       console.error('❌ Failed to fetch my rides:', err);
     }
@@ -30,25 +54,36 @@ const MyRidesPage = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    // Decode token to get user ID
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const userId = payload.id;
-
     socketRef.current = io('http://localhost:5000');
-
     fetchMyRides();
 
-    socketRef.current.on('ride_booked', ({ rideId, byUserId, message }) => {
+    socketRef.current.on('ride_booked', ({ rideId, message }) => {
       toast.info(message || `Someone booked your ride (${rideId})`);
-      fetchMyRides(); // Refresh rides on booking
+      fetchMyRides();
       setTimeout(() => {
-    window.location.href = `/current-ride/${rideId}`;
-  }, 1000);
+        window.location.href = `/current-ride/${rideId}`;
+      }, 1000);
     });
 
     return () => {
       socketRef.current.disconnect();
     };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdowns((prev) => {
+        const updated = { ...prev };
+        for (const id in updated) {
+          if (updated[id] > 0) {
+            updated[id] -= 1;
+          }
+        }
+        return updated;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -67,6 +102,15 @@ const MyRidesPage = () => {
             <p><strong>Date:</strong> {new Date(ride.date).toLocaleDateString()}</p>
             <p><strong>Seats Left:</strong> {ride.seatsAvailable}</p>
             <p><strong>Cost:</strong> ₹{ride.costPerPerson}</p>
+
+            <p>
+              <strong>Driver arriving in:</strong>{' '}
+              {ride.bookedBy?.length > 0
+                ? '⏸️ Paused (Ride Booked)'
+                : (countdowns[ride._id] > 0
+                  ? formatTime(countdowns[ride._id])
+                  : 'Arrived')}
+            </p>
 
             {ride.bookedBy?.length > 0 ? (
               <p><strong>Booked By:</strong> {ride.bookedBy.length} user(s)</p>

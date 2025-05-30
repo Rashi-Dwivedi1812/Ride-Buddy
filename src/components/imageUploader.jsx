@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 
-const ImageUploader = ({ onUpload }) => {
+const ImageUploader = ({ onUpload, uploaded }) => {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState('');
   const [error, setError] = useState('');
@@ -21,7 +21,7 @@ const ImageUploader = ({ onUpload }) => {
 
     const formData = new FormData();
     formData.append('file', image);
-    formData.append('upload_preset', 'post_ride_upload'); // your unsigned preset
+    formData.append('upload_preset', 'post_ride_upload'); // Your Cloudinary unsigned preset
 
     setUploading(true);
     try {
@@ -29,7 +29,7 @@ const ImageUploader = ({ onUpload }) => {
         'https://api.cloudinary.com/v1_1/dqh2wytcb/image/upload',
         formData
       );
-      onUpload(res.data.secure_url); // Send the URL to the parent
+      onUpload(res.data.secure_url); // Send URL to parent
       setError('');
     } catch (err) {
       console.error('Upload failed:', err);
@@ -46,10 +46,12 @@ const ImageUploader = ({ onUpload }) => {
       {error && <p className="text-red-500">{error}</p>}
       <button
         onClick={handleUpload}
-        disabled={!image || uploading}
-        className="bg-blue-500 text-white px-4 py-2 rounded mt-2"
+        disabled={!image || uploading || uploaded}
+        className={`text-white px-4 py-2 rounded mt-2 ${
+          uploaded ? 'bg-green-600' : 'bg-blue-500'
+        }`}
       >
-        {uploading ? 'Uploading...' : 'Upload Screenshot'}
+        {uploaded ? 'Uploaded' : uploading ? 'Uploading...' : 'Upload Screenshot'}
       </button>
     </div>
   );

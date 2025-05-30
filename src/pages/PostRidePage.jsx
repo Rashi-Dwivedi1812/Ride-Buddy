@@ -16,6 +16,7 @@ const PostRidePage = () => {
     cabScreenshotUrl: '',
   });
   const [error, setError] = useState('');
+  const [screenshotUploaded, setScreenshotUploaded] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) =>
@@ -25,17 +26,14 @@ const PostRidePage = () => {
     e.preventDefault();
     setError('');
 
-    // Validation
-    if (!form.from || !form.to) {
-      return setError('From and To fields are required');
-    }
+    if (!form.from || !form.to) return setError('From and To fields are required');
 
     if (!form.date || new Date(form.date) < new Date().setHours(0, 0, 0, 0)) {
       return setError('Date must be today or in the future');
     }
 
-    if (!form.driverArrivingIn) {
-      return setError('Please specify when the driver is arriving');
+    if (!form.driverArrivingIn || Number(form.driverArrivingIn) <= 0) {
+      return setError('Please specify a valid driver arrival time in minutes');
     }
 
     if (!form.seatsAvailable || Number(form.seatsAvailable) <= 0) {
@@ -52,6 +50,7 @@ const PostRidePage = () => {
         'http://localhost:5000/api/rides',
         {
           ...form,
+          driverArrivingIn: Number(form.driverArrivingIn),
           seatsAvailable: Number(form.seatsAvailable),
           costPerPerson: Number(form.costPerPerson),
         },
@@ -78,6 +77,7 @@ const PostRidePage = () => {
       >
         <h2 className="text-xl font-semibold mb-4">Post a Ride</h2>
         {error && <p className="text-red-500 mb-2">{error}</p>}
+
         <input
           name="from"
           placeholder="From (e.g. Sector 62)"
@@ -85,6 +85,7 @@ const PostRidePage = () => {
           value={form.from}
           onChange={handleChange}
         />
+
         <input
           name="to"
           placeholder="To (e.g. Sector 128)"
@@ -92,6 +93,7 @@ const PostRidePage = () => {
           value={form.to}
           onChange={handleChange}
         />
+
         <input
           name="date"
           type="date"
@@ -99,13 +101,17 @@ const PostRidePage = () => {
           value={form.date}
           onChange={handleChange}
         />
+
         <input
           name="driverArrivingIn"
-          placeholder="Driver arriving in (e.g. 10 mins)"
+          type="number"
+          placeholder="Driver arriving in (minutes)"
           className="input w-full px-4 py-2 border rounded-md mb-4"
           value={form.driverArrivingIn}
           onChange={handleChange}
+          min={1}
         />
+
         <input
           name="seatsAvailable"
           type="number"
@@ -114,6 +120,7 @@ const PostRidePage = () => {
           value={form.seatsAvailable}
           onChange={handleChange}
         />
+
         <input
           name="costPerPerson"
           type="number"
@@ -122,10 +129,16 @@ const PostRidePage = () => {
           value={form.costPerPerson}
           onChange={handleChange}
         />
+
         <ImageUploader
-          onUpload={(url) => setForm({ ...form, cabScreenshotUrl: url })}
+          onUpload={(url) => {
+            setForm({ ...form, cabScreenshotUrl: url });
+            setScreenshotUploaded(true);
+          }}
+          uploaded={screenshotUploaded}
         />
-        <button className="bg-green-600 text-white w-full py-2 rounded-xl">
+
+        <button className="bg-green-600 text-white w-full py-2 rounded-xl mt-4">
           Post Ride
         </button>
       </form>

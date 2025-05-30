@@ -1,7 +1,6 @@
 import express from 'express';
 import Ride from '../models/Ride.js';
 import auth from '../middleware/authMiddleware.js';
-import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -51,20 +50,22 @@ router.get('/', async (req, res) => {
 
     res.json(rides);
   } catch (err) {
+    console.error('Error fetching rides:', err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
 
-// GET /api/rides/:id - get ride detail (✅ updated with bookedBy name)
+// GET /api/rides/:id - get ride detail
 router.get('/:id', async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id)
       .populate('driver', 'name')
-      .populate('bookedBy', 'name'); // ✅ critical line added
+      .populate('bookedBy', 'name');
 
     if (!ride) return res.status(404).json({ msg: 'Ride not found' });
     res.json(ride);
   } catch (err) {
+    console.error('Error fetching ride:', err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
@@ -76,21 +77,25 @@ router.post('/:id/book', auth, async (req, res) => {
     if (!ride) return res.status(404).json({ msg: 'Ride not found' });
 
     if (ride.seatsAvailable <= 0) return res.status(400).json({ msg: 'No seats available' });
-    if (ride.bookedBy.includes(req.user)) return res.status(400).json({ msg: 'Already booked' });
 
-    ride.bookedBy.push(req.user);
+    if (ride.bookedBy.some(userId => userId.toString() === req.user._id.toString())) {
+      return res.status(400).json({ msg: 'Already booked this ride' });
+    }
+
+    ride.bookedBy.push(req.user._id);
     ride.seatsAvailable -= 1;
     await ride.save();
 
     const io = req.app.get('io');
     io.to(ride._id.toString()).emit('ride_booked', {
       rideId: ride._id,
-      byUserId: req.user,
+      byUserId: req.user._id,
       message: 'A user just booked your ride!',
     });
 
     res.json({ msg: 'Seat booked successfully' });
   } catch (err) {
+    console.error('Book ride error:', err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
@@ -101,16 +106,16 @@ router.post('/:id/reject', auth, async (req, res) => {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ msg: 'Ride not found' });
 
-    // Optional: add logic to handle rejections
+    // Optionally track rejections
 
     res.json({ msg: 'Ride rejected' });
   } catch (err) {
-    console.error('Error rejecting ride:', err);
+    console.error('Reject ride error:', err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
 
-// GET /api/rides/mine - get rides posted by the logged-in user
+// GET /api/rides/mine - get user's posted rides
 router.get('/mine', auth, async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
@@ -121,18 +126,25 @@ router.get('/mine', auth, async (req, res) => {
     res.json(rides);
   } catch (err) {
     console.error('Error fetching user rides:', err);
-    res.status(500).json({ msg: 'Server error', error: err.message });
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
 // POST /api/rides/:rideId/accept - accept a ride
+// POST /api/rides/:rideId/accept - safely accept a ride
 router.post('/:rideId/accept', auth, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.rideId);
+
     if (!ride) return res.status(404).json({ msg: 'Ride not found' });
 
-    if (ride.bookedBy.includes(req.user._id)) {
-      return res.status(400).json({ msg: 'You already accepted this ride' });
+    // Ensure bookedBy is treated as array
+    const alreadyBooked = Array.isArray(ride.bookedBy)
+      ? ride.bookedBy.some(userId => userId.toString() === req.user._id.toString())
+      : false;
+
+    if (alreadyBooked) {
+      return res.status(400).json({ msg: 'Already booked this ride' });
     }
 
     if (ride.seatsAvailable <= 0) {
@@ -145,7 +157,7 @@ router.post('/:rideId/accept', auth, async (req, res) => {
 
     const updatedRide = await Ride.findById(req.params.rideId)
       .populate('driver', 'name')
-      .populate('bookedBy', 'name'); // ✅ ensure updated passengers list
+      .populate('bookedBy', 'name');
 
     res.json(updatedRide);
   } catch (err) {

@@ -10,7 +10,7 @@ const ProfilePage = () => {
 
   useEffect(() => {
     setLoading(true);
-    api.get('/users/me')
+    axios.get('/users/me')
       .then(res => {
         setPostedRides(res.data.postedRides || []);
         setBookedRides(res.data.bookedRides || []);
