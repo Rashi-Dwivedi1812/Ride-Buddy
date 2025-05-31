@@ -12,8 +12,10 @@ import { ToastContainer } from 'react-toastify';
 import CurrentRidePage from './pages/currentRidePage';
 import 'react-toastify/dist/ReactToastify.css';
 
+
 const App = () => {
   return (
+    
     <Router>
       <>
         <Routes>

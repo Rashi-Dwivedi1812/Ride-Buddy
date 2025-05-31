@@ -27,7 +27,6 @@ const SignUpPage = () => {
 
     try {
       const res = await axios.post('http://localhost:5000/api/auth/register', {
-
         name: form.name,
         email: form.email,
         password: form.password
@@ -41,18 +40,29 @@ const SignUpPage = () => {
   };
 
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-      <form className="bg-white p-8 rounded shadow-md w-full max-w-md" onSubmit={handleSubmit}>
-        <h2 className="text-2xl font-bold mb-4">Sign Up</h2>
+    <div className="dark min-h-screen bg-[#0f0f0f] text-white flex items-center justify-center relative overflow-hidden px-4">
+      {/* Background grid and blur overlay */}
+      <div className="absolute inset-0 bg-[radial-gradient(#ffffff0d_1px,transparent_1px)] [background-size:20px_20px] z-0" />
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-700 opacity-10 blur-2xl z-0" />
 
-        {error && <p className="text-red-500 mb-2">{error}</p>}
+      {/* SignUp Card */}
+      <form
+        onSubmit={handleSubmit}
+        className="group relative z-10 w-full max-w-md bg-white/10 backdrop-blur-md p-8 rounded-2xl shadow-2xl border border-white/20 text-white
+                 transition-all duration-300 hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.03] hover:border-purple-400"
+      >
+        <h2 className="text-3xl font-bold text-center mb-6 text-white">
+          Create Account on <span className="text-blue-400">Ride Buddy</span>
+        </h2>
+
+        {error && <p className="text-red-400 mb-4 text-sm text-center">{error}</p>}
 
         <input
           name="name"
           placeholder="Name"
           value={form.name}
           onChange={handleChange}
-          className="w-full px-4 py-2 border rounded-md mb-4"
+          className="w-full mb-4 px-4 py-3 rounded-xl bg-white/5 border border-white/20 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
         />
         <input
           name="email"
@@ -60,7 +70,7 @@ const SignUpPage = () => {
           placeholder="College Email"
           value={form.email}
           onChange={handleChange}
-          className="w-full px-4 py-2 border rounded-md mb-4"
+          className="w-full mb-4 px-4 py-3 rounded-xl bg-white/5 border border-white/20 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
         />
         <input
           name="password"
@@ -68,7 +78,7 @@ const SignUpPage = () => {
           placeholder="Password"
           value={form.password}
           onChange={handleChange}
-          className="w-full px-4 py-2 border rounded-md mb-4"
+          className="w-full mb-4 px-4 py-3 rounded-xl bg-white/5 border border-white/20 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
         />
         <input
           name="confirmPassword"
@@ -76,10 +86,17 @@ const SignUpPage = () => {
           placeholder="Confirm Password"
           value={form.confirmPassword}
           onChange={handleChange}
-          className="w-full px-4 py-2 border rounded-md mb-4"
+          className="w-full mb-6 px-4 py-3 rounded-xl bg-white/5 border border-white/20 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
         />
 
-        <button className="w-full bg-blue-600 text-white py-2 mt-4 rounded-xl">Sign Up</button>
+        <button
+          type="submit"
+          className="group relative w-full bg-blue-600 hover:bg-blue-700 text-white py-3 font-semibold rounded-2xl transition-all duration-300 shadow-lg"
+        >
+          Sign Up
+          <span className="ml-2 transform translate-x-0 group-hover:translate-x-1.5 transition-transform duration-300">→</span>
+          <span className="absolute inset-0 rounded-2xl ring-2 ring-blue-400 opacity-0 group-hover:opacity-100 blur-md animate-pulse transition duration-300" />
+        </button>
       </form>
     </div>
   );

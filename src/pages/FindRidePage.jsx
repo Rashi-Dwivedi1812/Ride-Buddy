@@ -9,7 +9,6 @@ const FindRidePage = () => {
   const [countdowns, setCountdowns] = useState({});
   const navigate = useNavigate();
 
-  // Fetch rides and initialize countdown timers
   useEffect(() => {
     const fetchRides = async () => {
       try {
@@ -40,7 +39,6 @@ const FindRidePage = () => {
     };
   }, []);
 
-  // Countdown timer updates
   useEffect(() => {
     const interval = setInterval(() => {
       setCountdowns(prev => {
@@ -58,7 +56,7 @@ const FindRidePage = () => {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
 
   const handleAccept = async (rideId) => {
@@ -78,14 +76,12 @@ const FindRidePage = () => {
 
       const updatedRide = res.data;
 
-      // Notify driver via socket
       socketRef.current.emit('ride_booked', {
         rideId,
         byUserId: userId,
         message: `${userName || 'Someone'} accepted your ride.`,
       });
 
-      // Update UI
       if (updatedRide.seatsAvailable === 0) {
         setRides(prev => prev.filter(ride => ride._id !== rideId));
       } else {
@@ -94,7 +90,6 @@ const FindRidePage = () => {
         );
       }
 
-      // Navigate to CurrentRidePage
       navigate(`/current-ride/${rideId}`);
     } catch (error) {
       const errMsg = error.response?.data?.msg || 'Failed to accept ride.';
@@ -120,49 +115,66 @@ const FindRidePage = () => {
   };
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4">Available Rides</h2>
-      <div className="grid gap-4">
+    <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center px-4 py-10 relative overflow-hidden">
+      {/* Background Grid and Glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(#ffffff0d_1px,transparent_1px)] [background-size:20px_20px] z-0" />
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-700 opacity-10 blur-2xl z-0" />
+
+      {/* Heading */}
+      <h2 className="z-10 text-4xl font-extrabold mb-8 text-white drop-shadow text-center">
+        🔍 Available Rides
+      </h2>
+
+      {/* Rides List */}
+      <div className="z-10 w-full max-w-4xl space-y-6">
         {rides.length === 0 ? (
-          <p>No rides available.</p>
+          <p className="text-gray-400 text-center">No rides available at the moment.</p>
         ) : (
           rides.map((ride) => (
-            <div key={ride._id} className="bg-white p-4 rounded shadow flex gap-4 items-start">
-              {ride.cabScreenshotUrl && (
-                <a href={ride.cabScreenshotUrl} target="_blank" rel="noopener noreferrer">
-                  <img
-                    src={ride.cabScreenshotUrl}
-                    alt="Cab Screenshot"
-                    className="w-24 h-24 object-cover rounded mb-2"
-                  />
-                </a>
-              )}
-              <div className="flex-1">
-                <p><strong>Name:</strong> {ride.driver?.name || 'Unknown'}</p>
-                <p><strong>From:</strong> {ride.from}</p>
-                <p><strong>To:</strong> {ride.to}</p>
-                <p><strong>Date:</strong> {new Date(ride.date).toLocaleDateString()}</p>
-                <p title={`Arrives in ${ride.driverArrivingIn} minute(s)`}>
-                  <strong>Driver arriving in:</strong>{' '}
+            <div
+              key={ride._id}
+              className="group relative z-10 w-full max-w-xl bg-white/10 backdrop-blur-md p-10 rounded-2xl shadow-2xl border border-white/20
+                      hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.02] hover:border-purple-400 transition-all duration-300"
+            >
+              <div className="grid grid-cols-2 gap-4 text-sm text-gray-200">
+                <p><span className="font-semibold text-green-400">Driver:</span> {ride.driver?.name || 'Unknown'}</p>
+                <p><span className="font-semibold text-green-400">From:</span> {ride.from}</p>
+                <p><span className="font-semibold text-green-400">To:</span> {ride.to}</p>
+                <p><span className="font-semibold text-green-400">Date:</span> {new Date(ride.date).toLocaleDateString()}</p>
+                <p>
+                  <span className="font-semibold text-green-400">Arriving in:</span>{' '}
                   {countdowns[ride._id] > 0 ? formatTime(countdowns[ride._id]) : 'Arrived'}
                 </p>
-                <p><strong>Cost per person:</strong> ₹{ride.costPerPerson}</p>
-                <p><strong>Seats Available:</strong> {ride.seatsAvailable}</p>
+                <p><span className="font-semibold text-green-400">Cost:</span> ₹{ride.costPerPerson}</p>
+                <p><span className="font-semibold text-green-400">Seats:</span> {ride.seatsAvailable}</p>
+              </div>
 
-                <div className="flex gap-2 mt-2">
+              {ride.cabScreenshotUrl && (
+                <div className="mt-4">
                   <button
-                    onClick={() => handleAccept(ride._id)}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded"
+                    onClick={() => window.open(ride.cabScreenshotUrl, '_blank')}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition"
                   >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => handleReject(ride._id)}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded"
-                  >
-                    Reject
+                    📷 View Cab Screenshot
                   </button>
                 </div>
+              )}
+
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={() => handleAccept(ride._id)}
+                  className="relative px-6 py-2 rounded-xl font-semibold bg-green-600 hover:bg-green-700 text-white transition-all duration-300"
+                >
+                  ✅ Accept
+                  <span className="absolute inset-0 rounded-xl ring-2 ring-green-400 opacity-0 group-hover:opacity-100 blur-md animate-pulse transition" />
+                </button>
+                <button
+                  onClick={() => handleReject(ride._id)}
+                  className="relative px-6 py-2 rounded-xl font-semibold bg-red-600 hover:bg-red-700 text-white transition-all duration-300"
+                >
+                  ❌ Reject
+                  <span className="absolute inset-0 rounded-xl ring-2 ring-red-400 opacity-0 group-hover:opacity-100 blur-md animate-pulse transition" />
+                </button>
               </div>
             </div>
           ))

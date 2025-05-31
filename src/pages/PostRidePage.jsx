@@ -70,62 +70,62 @@ const PostRidePage = () => {
   };
 
   return (
-    <div className="flex justify-center py-10 bg-gray-100">
+    <div className="dark min-h-screen bg-[#0f0f0f] text-white flex items-center justify-center relative px-4">
+      {/* Glowing background */}
+      <div className="absolute inset-0 bg-[radial-gradient(#ffffff0d_1px,transparent_1px)] [background-size:20px_20px] z-0" />
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-700 opacity-10 blur-2xl z-0" />
+
+      {/* Card with hover glow */}
       <form
-        className="bg-white p-6 rounded shadow-md w-full max-w-lg"
         onSubmit={handleSubmit}
+        className="group relative z-10 w-full max-w-xl bg-white/10 backdrop-blur-md p-10 rounded-2xl shadow-2xl border border-white/20
+                      hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.02] hover:border-purple-400 transition-all duration-300"
       >
-        <h2 className="text-xl font-semibold mb-4">Post a Ride</h2>
-        {error && <p className="text-red-500 mb-2">{error}</p>}
+        <h2 className="text-3xl font-bold text-center mb-6 text-white">Post a Ride 🚖</h2>
+        {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
 
         <input
           name="from"
           placeholder="From (e.g. Sector 62)"
-          className="input w-full px-4 py-2 border rounded-md mb-4"
+          className="w-full px-4 py-2 bg-white/10 border border-gray-300 text-white rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-400"
           value={form.from}
           onChange={handleChange}
         />
-
         <input
           name="to"
           placeholder="To (e.g. Sector 128)"
-          className="input w-full px-4 py-2 border rounded-md mb-4"
+          className="w-full px-4 py-2 bg-white/10 border border-gray-300 text-white rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-400"
           value={form.to}
           onChange={handleChange}
         />
-
         <input
           name="date"
           type="date"
-          className="input w-full px-4 py-2 border rounded-md mb-4"
+          className="w-full px-4 py-2 bg-white/10 border border-gray-300 text-white rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-400"
           value={form.date}
           onChange={handleChange}
         />
-
         <input
           name="driverArrivingIn"
           type="number"
           placeholder="Driver arriving in (minutes)"
-          className="input w-full px-4 py-2 border rounded-md mb-4"
+          className="w-full px-4 py-2 bg-white/10 border border-gray-300 text-white rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-400"
           value={form.driverArrivingIn}
           onChange={handleChange}
-          min={1}
         />
-
         <input
           name="seatsAvailable"
           type="number"
           placeholder="Seats Available"
-          className="input w-full px-4 py-2 border rounded-md mb-4"
+          className="w-full px-4 py-2 bg-white/10 border border-gray-300 text-white rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-400"
           value={form.seatsAvailable}
           onChange={handleChange}
         />
-
         <input
           name="costPerPerson"
           type="number"
-          placeholder="Cost per Person (₹)"
-          className="input w-full px-4 py-2 border rounded-md mb-4"
+          placeholder="Cab Price (₹)"
+          className="w-full px-4 py-2 bg-white/10 border border-gray-300 text-white rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-400"
           value={form.costPerPerson}
           onChange={handleChange}
         />
@@ -138,8 +138,12 @@ const PostRidePage = () => {
           uploaded={screenshotUploaded}
         />
 
-        <button className="bg-green-600 text-white w-full py-2 rounded-xl mt-4">
-          Post Ride
+        <button
+          type="submit"
+          className="group relative w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 mt-6 rounded-xl transition-all duration-300"
+        >
+          Post Ride ✏️
+          <span className="absolute inset-0 rounded-xl ring-2 ring-green-400 opacity-0 group-hover:opacity-100 blur-md animate-pulse transition duration-300" />
         </button>
       </form>
     </div>

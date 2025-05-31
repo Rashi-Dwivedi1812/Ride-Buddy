@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 const MyRidesPage = () => {
   const [rides, setRides] = useState([]);
   const [countdowns, setCountdowns] = useState({});
+  const [showImageRideId, setShowImageRideId] = useState(null);
   const socketRef = useRef(null);
 
   const formatTime = (seconds) => {
@@ -87,55 +88,82 @@ const MyRidesPage = () => {
   }, []);
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <h2 className="text-2xl font-semibold mb-6">My Rides</h2>
-      {rides.length === 0 ? (
-        <p className="text-gray-600">You haven't posted any rides yet.</p>
-      ) : (
-        rides.map((ride) => (
-          <div
-            key={ride._id}
-            className="bg-white shadow-md rounded-xl p-4 mb-4 border border-gray-200"
-          >
-            <p><strong>From:</strong> {ride.from}</p>
-            <p><strong>To:</strong> {ride.to}</p>
-            <p><strong>Date:</strong> {new Date(ride.date).toLocaleDateString()}</p>
-            <p><strong>Seats Left:</strong> {ride.seatsAvailable}</p>
-            <p><strong>Cost:</strong> ₹{ride.costPerPerson}</p>
+    <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center px-4 py-10 relative overflow-hidden">
+      {/* Background grid & blur */}
+      <div className="absolute inset-0 bg-[radial-gradient(#ffffff0d_1px,transparent_1px)] [background-size:20px_20px] z-0" />
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-700 opacity-10 blur-2xl z-0" />
 
-            <p>
-              <strong>Driver arriving in:</strong>{' '}
-              {ride.bookedBy?.length > 0
-                ? '⏸️ Paused (Ride Booked)'
-                : (countdowns[ride._id] > 0
-                  ? formatTime(countdowns[ride._id])
-                  : 'Arrived')}
-            </p>
-
-            {ride.bookedBy?.length > 0 ? (
-              <p><strong>Booked By:</strong> {ride.bookedBy.length} user(s)</p>
-            ) : (
-              <p className="text-yellow-600 font-medium">
-                ⏳ Waiting for someone to book this ride...
-              </p>
-            )}
-
-            {ride.cabScreenshotUrl && (
-              <a
-                href={ride.cabScreenshotUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <img
-                  src={ride.cabScreenshotUrl}
-                  alt="Cab Screenshot"
-                  className="mt-2 max-h-48 object-cover rounded hover:opacity-90 transition"
-                />
-              </a>
-            )}
+      {/* Modal */}
+      {showImageRideId && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-black p-4 rounded-lg shadow-lg relative max-w-4xl w-full">
+            <button
+              className="absolute top-2 right-2 text-white text-2xl"
+              onClick={() => setShowImageRideId(null)}
+            >
+              &times;
+            </button>
+            <img
+              src={rides.find(r => r._id === showImageRideId)?.cabScreenshotUrl}
+              alt="Cab Screenshot"
+              className="w-full h-auto rounded-xl"
+            />
           </div>
-        ))
+        </div>
       )}
+
+      {/* Heading */}
+      <h2 className="z-10 text-4xl font-extrabold mb-8 text-white drop-shadow text-center">
+        🚗 My Rides
+      </h2>
+
+      {/* Rides List */}
+      <div className="z-10 w-full max-w-4xl space-y-6">
+        {rides.length === 0 ? (
+          <p className="text-gray-400 text-center">You haven't posted any rides yet.</p>
+        ) : (
+          rides.map((ride) => (
+            <div
+              key={ride._id}
+              className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20
+                         hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.01] hover:border-purple-400 transition-all duration-300"
+            >
+              <div className="grid grid-cols-2 gap-4 text-sm text-gray-200">
+                <p><span className="font-semibold text-purple-400">From:</span> {ride.from}</p>
+                <p><span className="font-semibold text-purple-400">To:</span> {ride.to}</p>
+                <p><span className="font-semibold text-purple-400">Date:</span> {new Date(ride.date).toLocaleDateString()}</p>
+                <p><span className="font-semibold text-purple-400">Seats Left:</span> {ride.seatsAvailable}</p>
+                <p><span className="font-semibold text-purple-400">Cost:</span> ₹{ride.costPerPerson}</p>
+                <p>
+                  <span className="font-semibold text-purple-400">Driver arriving in:</span>{' '}
+                  {ride.bookedBy?.length > 0
+                    ? '⏸️ Paused (Ride Booked)'
+                    : (countdowns[ride._id] > 0
+                      ? formatTime(countdowns[ride._id])
+                      : 'Arrived')}
+                </p>
+              </div>
+
+              <div className="mt-4">
+                {ride.bookedBy?.length > 0 ? (
+                  <p className="text-green-400 font-medium">✅ Booked by {ride.bookedBy.length} user(s)</p>
+                ) : (
+                  <p className="text-yellow-400 font-medium">⏳ Waiting for someone to book this ride...</p>
+                )}
+              </div>
+
+              {ride.cabScreenshotUrl && (
+                <button
+                  onClick={() => setShowImageRideId(ride._id)}
+                  className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
+                >
+                  📷 View Cab Screenshot
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
