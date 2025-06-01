@@ -59,11 +59,29 @@ const CurrentRidePage = () => {
     socketRef.current.emit('join_room', rideId);
 
     socketRef.current.on('chat_message', (msg) => {
-      const isInvolved = msg.senderId === currentUser?._id || msg.receiverId === currentUser?._id;
-      if (isInvolved && (msg.senderId === selectedPassenger?._id || msg.receiverId === selectedPassenger?._id)) {
+      const isInvolved =
+        msg.senderId === currentUser?._id || msg.receiverId === currentUser?._id;
+
+      if (
+        isInvolved &&
+        (msg.senderId === selectedPassenger?._id || msg.receiverId === selectedPassenger?._id)
+      ) {
         setChatMessages((prev) => [...prev, msg]);
       }
     });
+
+    socketRef.current.on('passenger_updated', async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const res = await axios.get(`http://localhost:5000/api/rides/${rideId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setRide(res.data);
+  } catch (err) {
+    console.error('Failed to refresh ride on passenger update:', err);
+  }
+});
+
 
     return () => {
       socketRef.current?.disconnect();
@@ -112,7 +130,7 @@ const CurrentRidePage = () => {
   if (!ride) return <p className="p-6 text-white">Loading ride...</p>;
 
   const chatTargets = isRideOwner
-    ? ride.bookedBy.filter(p => p._id !== currentUser?._id)
+    ? ride.bookedBy.filter((p) => p._id !== currentUser?._id)
     : [ride.creator];
 
   return (
@@ -128,12 +146,28 @@ const CurrentRidePage = () => {
         {/* Ride Info */}
         <div className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20">
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-200">
-            <p><span className="font-semibold text-purple-400">Ride Owner:</span> {ride.driver?.name || 'Unknown'}</p>
-             <p><span className="font-semibold text-purple-400">Date:</span> {new Date(ride.date).toLocaleDateString()}</p>
-            <p><span className="font-semibold text-purple-400">From:</span> {ride.from}</p>
-            <p><span className="font-semibold text-purple-400">To:</span> {ride.to}</p>
-            <p><span className="font-semibold text-purple-400">Driver Arrives In:</span> {formatTime(arrivalTimeLeft || 0)}</p>
-            <p><span className="font-semibold text-purple-400">Cab Price:</span> ₹{ride.costPerPerson}</p>
+            <p>
+              <span className="font-semibold text-purple-400">Ride Owner:</span>{' '}
+              {ride.driver?.name || 'Unknown'}
+            </p>
+            <p>
+              <span className="font-semibold text-purple-400">Date:</span>{' '}
+              {new Date(ride.date).toLocaleDateString()}
+            </p>
+            <p>
+              <span className="font-semibold text-purple-400">From:</span> {ride.from}
+            </p>
+            <p>
+              <span className="font-semibold text-purple-400">To:</span> {ride.to}
+            </p>
+            <p>
+              <span className="font-semibold text-purple-400">Driver Arrives In:</span>{' '}
+              {formatTime(arrivalTimeLeft || 0)}
+            </p>
+            <p>
+              <span className="font-semibold text-purple-400">Cab Price:</span> ₹
+              {ride.costPerPerson}
+            </p>
           </div>
 
           {ride.cabScreenshotUrl && (
@@ -169,7 +203,9 @@ const CurrentRidePage = () => {
               </div>
             ))
           ) : (
-            <p className="text-gray-400">{isRideOwner ? 'No passengers yet.' : 'Waiting for ride owner.'}</p>
+            <p className="text-gray-400">
+              {isRideOwner ? 'No passengers yet.' : 'Waiting for ride owner.'}
+            </p>
           )}
         </div>
 
@@ -178,7 +214,12 @@ const CurrentRidePage = () => {
           <div className="fixed bottom-4 right-4 w-96 bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-purple-500 z-50 shadow-xl">
             <div className="flex justify-between items-center mb-2">
               <h4 className="text-white font-semibold">Chat with {selectedPassenger.name}</h4>
-              <button onClick={() => setSelectedPassenger(null)} className="text-red-300 font-bold">✕</button>
+              <button
+                onClick={() => setSelectedPassenger(null)}
+                className="text-red-300 font-bold"
+              >
+                ✕
+              </button>
             </div>
             <div className="h-40 overflow-y-auto bg-black/30 text-white text-sm p-2 rounded mb-3">
               {chatMessages.length === 0 ? (
@@ -186,7 +227,8 @@ const CurrentRidePage = () => {
               ) : (
                 chatMessages.map((msg, idx) => (
                   <p key={idx}>
-                    <span className="text-green-300 font-semibold">{msg.senderName}:</span> {msg.text}
+                    <span className="text-green-300 font-semibold">{msg.senderName}:</span>{' '}
+                    {msg.text}
                   </p>
                 ))
               )}

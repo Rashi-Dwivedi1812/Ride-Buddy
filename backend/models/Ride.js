@@ -23,7 +23,7 @@ const RideSchema = new mongoose.Schema(
     },
 
     date: {
-      type: Date, // Use actual Date type for validation
+      type: Date,
       required: true,
       validate: {
         validator: function (value) {
@@ -36,7 +36,7 @@ const RideSchema = new mongoose.Schema(
     },
 
     driverArrivingIn: {
-      type: Number, // Changed from String ➝ Number (minutes)
+      type: Number,
       required: true,
       min: [0, 'Driver arrival time must be a non-negative number']
     },
@@ -45,6 +45,12 @@ const RideSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: [0, 'Seats available cannot be negative']
+    },
+
+    initialSeats: {
+      type: Number,
+      required: true,
+      min: [0, 'Initial seats must be non-negative']
     },
 
     costPerPerson: {
@@ -64,30 +70,22 @@ const RideSchema = new mongoose.Schema(
       }
     ]
   },
-  { timestamps: true } // adds createdAt and updatedAt automatically
+  { timestamps: true }
 );
 
-// Store initial seat count when creating a ride
+// Ensure number of bookings does not exceed initial seats
 RideSchema.pre('save', function (next) {
-  if (this.isNew) {
-    this._initialSeatsAvailable = this.seatsAvailable;
-  }
-  next();
-});
-
-// Validate booked users ≤ initial seats
-RideSchema.pre('save', function (next) {
-  const initialSeats = this.isNew
-    ? this.seatsAvailable
-    : this._initialSeatsAvailable;
-
-  if (this.bookedBy.length > initialSeats) {
+  if (this.bookedBy.length > this.initialSeats) {
     return next(
       new Error('Number of booked users cannot exceed initial seats available')
     );
   }
-
   next();
+});
+
+// Virtual field to compute how many seats have been booked
+RideSchema.virtual('seatsBooked').get(function () {
+  return this.bookedBy.length;
 });
 
 const Ride = mongoose.model('Ride', RideSchema);

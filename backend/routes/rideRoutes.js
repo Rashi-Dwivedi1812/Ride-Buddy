@@ -1,3 +1,5 @@
+// routes/rides.js (ESM version)
+
 import express from 'express';
 import Ride from '../models/Ride.js';
 import auth from '../middleware/authMiddleware.js';
@@ -20,6 +22,7 @@ router.post('/', auth, async (req, res) => {
       date,
       driverArrivingIn,
       seatsAvailable,
+      initialSeats: seatsAvailable,
       costPerPerson,
       cabScreenshotUrl,
     });
@@ -87,11 +90,23 @@ router.post('/:id/book', auth, async (req, res) => {
     await ride.save();
 
     const io = req.app.get('io');
-    io.to(ride._id.toString()).emit('ride_booked', {
-      rideId: ride._id,
-      byUserId: req.user._id,
-      message: 'A user just booked your ride!',
-    });
+    const populatedRide = await Ride.findById(ride._id)
+      .populate('driver', 'name')
+      .populate('bookedBy', 'name');
+
+    // Emit ride_booked and passenger_updated
+    if (io && ride._id) {
+      io.to(ride._id.toString()).emit('ride_booked', {
+        rideId: ride._id,
+        byUserId: req.user._id,
+        message: `${req.user.name} booked your ride`,
+      });
+
+      io.to(ride._id.toString()).emit('passenger_updated', {
+        rideId: ride._id,
+        passengers: populatedRide.bookedBy,
+      });
+    }
 
     res.json({ msg: 'Seat booked successfully' });
   } catch (err) {
@@ -107,7 +122,6 @@ router.post('/:id/reject', auth, async (req, res) => {
     if (!ride) return res.status(404).json({ msg: 'Ride not found' });
 
     // Optionally track rejections
-
     res.json({ msg: 'Ride rejected' });
   } catch (err) {
     console.error('Reject ride error:', err);
@@ -131,14 +145,12 @@ router.get('/mine', auth, async (req, res) => {
 });
 
 // POST /api/rides/:rideId/accept - accept a ride
-// POST /api/rides/:rideId/accept - safely accept a ride
 router.post('/:rideId/accept', auth, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.rideId);
 
     if (!ride) return res.status(404).json({ msg: 'Ride not found' });
 
-    // Ensure bookedBy is treated as array
     const alreadyBooked = Array.isArray(ride.bookedBy)
       ? ride.bookedBy.some(userId => userId.toString() === req.user._id.toString())
       : false;
@@ -158,6 +170,19 @@ router.post('/:rideId/accept', auth, async (req, res) => {
     const updatedRide = await Ride.findById(req.params.rideId)
       .populate('driver', 'name')
       .populate('bookedBy', 'name');
+
+    const io = req.app.get('io');
+    if (io && ride._id) {
+      io.to(ride._id.toString()).emit('ride_booked', {
+        rideId: ride._id,
+        message: `${req.user.name} booked your ride`,
+      });
+
+      io.to(ride._id.toString()).emit('passenger_updated', {
+        rideId: ride._id,
+        passengers: updatedRide.bookedBy,
+      });
+    }
 
     res.json(updatedRide);
   } catch (err) {
