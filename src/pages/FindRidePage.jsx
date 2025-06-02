@@ -90,7 +90,7 @@ const FindRidePage = () => {
         );
       }
 
-      navigate(`/current-ride/${rideId}`);
+      navigate(`/passenger-ride/${rideId}`);
     } catch (error) {
       const errMsg = error.response?.data?.msg || 'Failed to accept ride.';
       alert(`❌ ${errMsg}`);
