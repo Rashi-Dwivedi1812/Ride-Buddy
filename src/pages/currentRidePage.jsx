@@ -25,63 +25,68 @@ const CurrentRidePage = () => {
     }
   };
 
+  const fetchRide = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`http://localhost:5000/api/rides/${rideId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setRide(res.data);
+      if (res.data.creator?._id === currentUser?._id) {
+        setIsRideOwner(true);
+      }
+      if (res.data.createdAt && res.data.driverArrivingIn) {
+        const createdAt = new Date(res.data.createdAt).getTime();
+        const now = Date.now();
+        const elapsed = Math.floor((now - createdAt) / 1000);
+        const remaining = Math.max(res.data.driverArrivingIn * 60 - elapsed, 0);
+        setArrivalTimeLeft(remaining);
+      }
+    } catch (err) {
+      console.error('Failed to fetch ride:', err);
+    }
+  };
+
+  const fetchMessages = async (receiverId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(
+        `http://localhost:5000/api/messages/${rideId}?receiverId=${receiverId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setChatMessages(res.data);
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+    }
+  };
+
   useEffect(() => {
     const user = parseToken();
     setCurrentUser(user);
-
-    const fetchRide = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`http://localhost:5000/api/rides/${rideId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setRide(res.data);
-
-        if (res.data.creator?._id === user?._id) {
-          setIsRideOwner(true);
-        }
-
-        if (res.data.createdAt && res.data.driverArrivingIn) {
-          const createdAt = new Date(res.data.createdAt).getTime();
-          const now = Date.now();
-          const elapsed = Math.floor((now - createdAt) / 1000);
-          const remaining = Math.max(res.data.driverArrivingIn * 60 - elapsed, 0);
-          setArrivalTimeLeft(remaining);
-        }
-      } catch (err) {
-        console.error('Failed to fetch ride:', err);
-      }
-    };
-
-    fetchRide();
 
     socketRef.current = io('http://localhost:5000');
     socketRef.current.emit('join_room', rideId);
 
     socketRef.current.on('chat_message', (msg) => {
       const isInvolved =
-        msg.senderId === currentUser?._id || msg.receiverId === currentUser?._id;
+        msg.senderId === user?._id || msg.receiverId === user?._id;
+      const isCurrentChat =
+        selectedPassenger &&
+        (msg.senderId === selectedPassenger._id ||
+         msg.receiverId === selectedPassenger._id);
 
-      if (
-        isInvolved &&
-        (msg.senderId === selectedPassenger?._id || msg.receiverId === selectedPassenger?._id)
-      ) {
+      if (isInvolved && isCurrentChat) {
         setChatMessages((prev) => [...prev, msg]);
       }
     });
 
     socketRef.current.on('passenger_updated', async () => {
-  try {
-    const token = localStorage.getItem('token');
-    const res = await axios.get(`http://localhost:5000/api/rides/${rideId}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      await fetchRide();
     });
-    setRide(res.data);
-  } catch (err) {
-    console.error('Failed to refresh ride on passenger update:', err);
-  }
-});
 
+    fetchRide();
 
     return () => {
       socketRef.current?.disconnect();
@@ -118,7 +123,7 @@ const CurrentRidePage = () => {
 
   const handleOpenChat = (user) => {
     setSelectedPassenger(user);
-    setChatMessages([]); // Reset on new chat
+    fetchMessages(user._id);
   };
 
   const formatTime = (seconds) => {
@@ -144,36 +149,15 @@ const CurrentRidePage = () => {
 
       <div className="z-10 w-full max-w-4xl space-y-8">
         {/* Ride Info */}
-        <div
-  className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20 
-             hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.01] hover:border-purple-400 transition-all duration-300"
->
-
+        <div className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20 hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.01] hover:border-purple-400 transition-all duration-300">
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-200">
-            <p>
-              <span className="font-semibold text-purple-400">Ride Owner:</span>{' '}
-              {ride.driver?.name || 'Unknown'}
-            </p>
-            <p>
-              <span className="font-semibold text-purple-400">Date:</span>{' '}
-              {new Date(ride.date).toLocaleDateString()}
-            </p>
-            <p>
-              <span className="font-semibold text-purple-400">From:</span> {ride.from}
-            </p>
-            <p>
-              <span className="font-semibold text-purple-400">To:</span> {ride.to}
-            </p>
-            <p>
-              <span className="font-semibold text-purple-400">Driver Arrives In:</span>{' '}
-              {formatTime(arrivalTimeLeft || 0)}
-            </p>
-            <p>
-              <span className="font-semibold text-purple-400">Cab Price:</span> ₹
-              {ride.costPerPerson}
-            </p>
+            <p><span className="font-semibold text-purple-400">Ride Owner:</span> {ride.driver?.name || 'Unknown'}</p>
+            <p><span className="font-semibold text-purple-400">Date:</span> {new Date(ride.date).toLocaleDateString()}</p>
+            <p><span className="font-semibold text-purple-400">From:</span> {ride.from}</p>
+            <p><span className="font-semibold text-purple-400">To:</span> {ride.to}</p>
+            <p><span className="font-semibold text-purple-400">Driver Arrives In:</span> {formatTime(arrivalTimeLeft || 0)}</p>
+            <p><span className="font-semibold text-purple-400">Cab Price:</span> ₹{ride.costPerPerson}</p>
           </div>
-
           {ride.cabScreenshotUrl && (
             <div className="mt-6">
               <a
@@ -189,15 +173,10 @@ const CurrentRidePage = () => {
         </div>
 
         {/* Passengers / Chat Targets */}
-        <div
-  className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20 
-             hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.01] hover:border-purple-400 transition-all duration-300"
->
-
+        <div className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20 hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.01] hover:border-purple-400 transition-all duration-300">
           <h3 className="text-xl font-semibold text-white mb-4">
             {isRideOwner ? '🧍‍♂️ Passengers' : '💬 Chat with Ride Owner'}
           </h3>
-
           {chatTargets.length > 0 ? (
             chatTargets.map((user) => (
               <div key={user._id} className="flex justify-between items-center text-green-300 mb-2">
@@ -235,8 +214,7 @@ const CurrentRidePage = () => {
               ) : (
                 chatMessages.map((msg, idx) => (
                   <p key={idx}>
-                    <span className="text-green-300 font-semibold">{msg.senderName}:</span>{' '}
-                    {msg.text}
+                    <span className="text-green-300 font-semibold">{msg.senderName}:</span> {msg.text}
                   </p>
                 ))
               )}

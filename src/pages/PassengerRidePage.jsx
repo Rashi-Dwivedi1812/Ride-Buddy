@@ -37,16 +37,16 @@ const PassengerRidePage = () => {
     socketRef.current = io('http://localhost:5000');
     socketRef.current.emit('join_room', rideId);
 
-    socketRef.current.on('new_message', (msg) => {
-      if (msg.rideId === rideId) {
-        setMessages((prev) => [...prev, msg]);
-      }
-    });
-
-    return () => {
-      socketRef.current?.disconnect();
-    };
-  }, [rideId]);
+    socketRef.current.on('chat_message', (msg) => {
+      if (
+  msg.rideId === rideId &&
+  (msg.senderId === userRef.current._id || msg.receiverId === userRef.current._id)
+) {
+  setMessages((prev) => [...prev, msg]);
+}
+    });    
+  return () => socketRef.current?.disconnect();
+}, [ride]);
 
   useEffect(() => {
     if (!ride?.createdAt || !ride?.driverArrivingIn) return;
@@ -67,18 +67,20 @@ const PassengerRidePage = () => {
   }, [ride]);
 
   const sendMessage = () => {
-    if (!newMessage.trim() || !ride || !userRef.current) return;
+  if (!newMessage.trim() || !ride || !userRef.current) return;
 
-    const messageData = {
-      rideId,
-      senderId: userRef.current._id,
-      receiverId: ride.createdBy?._id,
-      message: newMessage,
-    };
+ const messageData = {
+  rideId,
+  senderId: userRef.current._id,
+  receiverId: ride.driver?._id,
+  senderName: userRef.current.name, // <-- match this to CurrentRidePage
+  text: newMessage,
+};
 
-    socketRef.current.emit('send_message', messageData);
-    setNewMessage('');
-  };
+  socketRef.current.emit('chat_message', messageData);
+  setNewMessage('');
+};
+
 
   const formatTime = (seconds) => {
     if (seconds == null || isNaN(seconds)) return 'Calculating...';
@@ -171,7 +173,7 @@ const PassengerRidePage = () => {
                     className={`${msg.senderId === userRef.current?._id ? 'text-right' : 'text-left'}`}
                   >
                     <span className="inline-block bg-white/20 px-3 py-1 rounded">
-                      {msg.message}
+                      {msg.text}
                     </span>
                   </p>
                 ))

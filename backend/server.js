@@ -12,7 +12,8 @@ import authRoutes from './routes/authRoutes.js';
 import rideRoutes from './routes/rideRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
-import Message from './models/Message.js'; // Needed for saving chat messages
+
+import Message from './models/Message.js';
 
 // Validate required env vars
 const requiredEnv = ['MONGO_URI', 'JWT_SECRET'];
@@ -26,7 +27,7 @@ requiredEnv.forEach((env) => {
 // Default to localhost:5173 if ALLOWED_ORIGINS not set
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173']; // ✅ frontend dev port
+  : ['http://localhost:5173'];
 
 // Express setup
 const app = express();
@@ -39,11 +40,7 @@ const corsOptions = {
 };
 
 // Middleware
-app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/api/upload', uploadRoutes);
 app.use('/uploads', express.static(path.resolve('uploads')));
@@ -77,22 +74,37 @@ const startServer = async () => {
         console.log(`User ${socket.id} joined room ${roomId}`);
       });
 
-      socket.on('send_message', async (data) => {
+      // ✅ Enhanced: Save and emit chat message
+      socket.on('chat_message', async (data) => {
         try {
-          const message = new Message({
-            ride: data.room,
-            sender: data.sender,
+          const savedMessage = await Message.create({
+            ride: data.rideId,
+            sender: data.senderId,
+            receiver: data.receiverId ,
             text: data.text,
           });
-          await message.save();
-          io.to(data.room).emit('receive_message', data);
+
+          const populatedMsg = await savedMessage.populate('sender', 'name');
+
+const payload = {
+  _id: savedMessage._id,
+  rideId: data.rideId,
+  senderId: populatedMsg.sender._id,
+  senderName: populatedMsg.sender.name,
+  receiverId: data.receiverId,
+  text: data.text,
+  createdAt: savedMessage.createdAt,
+};
+
+
+          io.to(data.room).emit('chat_message', payload);
         } catch (err) {
-          console.error('Error saving message:', err);
+          console.error('❌ Error saving message:', err);
           socket.emit('message_error', { error: err.message });
         }
       });
 
-      // ✅ NEW: Ride Booked Notification
+      // ✅ Ride Booked Notification
       socket.on('ride_booked', ({ rideId, byUserId, message }) => {
         console.log(`📣 Ride booked: ${rideId} by ${byUserId}`);
         io.to(rideId).emit('ride_booked', {
@@ -119,5 +131,4 @@ const startServer = async () => {
   }
 };
 
-// Launch app
 startServer();

@@ -1,14 +1,13 @@
 import mongoose from 'mongoose';
 
-const MessageSchema = new mongoose.Schema({
-  ride: { type: mongoose.Schema.Types.ObjectId, ref: 'Ride', required: true },
-  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  text: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now },
-});
+const messageSchema = new mongoose.Schema({
+  ride: { type: mongoose.Schema.Types.ObjectId, ref: 'Ride' },
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  text: String,
+}, { timestamps: true });
 
-// Add index on ride and timestamp for efficient querying and sorting
-MessageSchema.index({ ride: 1, timestamp: 1 });
+messageSchema.index({ ride: 1, createdAt: 1 }); // update the index accordingly
 
-const Message = mongoose.model('Message', MessageSchema);
+const Message = mongoose.model('Message', messageSchema);
 export default Message;
