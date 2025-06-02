@@ -144,7 +144,11 @@ const CurrentRidePage = () => {
 
       <div className="z-10 w-full max-w-4xl space-y-8">
         {/* Ride Info */}
-        <div className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20">
+        <div
+  className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20 
+             hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.01] hover:border-purple-400 transition-all duration-300"
+>
+
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-200">
             <p>
               <span className="font-semibold text-purple-400">Ride Owner:</span>{' '}
@@ -185,7 +189,11 @@ const CurrentRidePage = () => {
         </div>
 
         {/* Passengers / Chat Targets */}
-        <div className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20">
+        <div
+  className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20 
+             hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.01] hover:border-purple-400 transition-all duration-300"
+>
+
           <h3 className="text-xl font-semibold text-white mb-4">
             {isRideOwner ? '🧍‍♂️ Passengers' : '💬 Chat with Ride Owner'}
           </h3>

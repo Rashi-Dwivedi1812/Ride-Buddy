@@ -137,7 +137,7 @@ const FindRidePage = () => {
                       hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.02] hover:border-purple-400 transition-all duration-300"
             >
               <div className="grid grid-cols-2 gap-4 text-sm text-gray-200">
-                <p><span className="font-semibold text-green-400">Driver:</span> {ride.driver?.name || 'Unknown'}</p>
+                <p><span className="font-semibold text-green-400">Ride Owner:</span> {ride.driver?.name || 'Unknown'}</p>
                 <p><span className="font-semibold text-green-400">From:</span> {ride.from}</p>
                 <p><span className="font-semibold text-green-400">To:</span> {ride.to}</p>
                 <p><span className="font-semibold text-green-400">Date:</span> {new Date(ride.date).toLocaleDateString()}</p>
