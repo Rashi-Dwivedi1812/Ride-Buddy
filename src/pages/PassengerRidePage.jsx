@@ -27,14 +27,11 @@ const PassengerRidePage = () => {
 
         const msgRes = await axios.get(`http://localhost:5000/api/messages/${rideId}`, { headers });
         setMessages(msgRes.data);
-      } catch (err) {
-        console.error('Error loading data:', err);
-      }
-    };
 
-    fetchRideAndUser();
-
-    socketRef.current = io('http://localhost:5000');
+         socketRef.current = io('http://localhost:5000', {
+        transports: ['websocket'], // explicitly set transport
+        withCredentials: true
+      });
     socketRef.current.emit('join_room', rideId);
 
     socketRef.current.on('chat_message', (msg) => {
@@ -45,8 +42,20 @@ const PassengerRidePage = () => {
   setMessages((prev) => [...prev, msg]);
 }
     });    
-  return () => socketRef.current?.disconnect();
-}, [ride]);
+  }
+ catch (err) {
+      console.error('Error loading data:', err);
+    }
+  };
+
+  fetchRideAndUser();
+
+  return () => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+  };
+}, [rideId]);
 
   useEffect(() => {
     if (!ride?.createdAt || !ride?.driverArrivingIn) return;
@@ -75,6 +84,7 @@ const PassengerRidePage = () => {
   receiverId: ride.driver?._id,
   senderName: userRef.current.name, // <-- match this to CurrentRidePage
   text: newMessage,
+    room: rideId,
 };
 
   socketRef.current.emit('chat_message', messageData);

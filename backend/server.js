@@ -53,7 +53,7 @@ const startServer = async () => {
     // Routes
     app.use('/api/auth', authRoutes);
     app.use('/api/rides', rideRoutes);
-    app.use('/api/chat', chatRoutes);
+    app.use('/api/messages', chatRoutes);
 
     // Socket.io setup
     const io = new Server(server, {

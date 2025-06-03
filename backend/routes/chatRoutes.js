@@ -13,15 +13,15 @@ router.get('/:rideId', auth, async (req, res) => {
   .lean();
 
     // Ensure frontend gets consistent format
-    const formatted = messages.map(msg => ({
-      _id: msg._id,
-      senderId: msg.sender._id,
-      senderName: msg.sender.name,
-      receiverId: msg.receiver,
-      rideId: msg.ride,
-      text: msg.text, 
-      createdAt: msg.createdAt,
-    }));
+ const formatted = messages.map(msg => ({
+  _id: msg._id,
+  senderId: msg.sender?._id || null,
+  senderName: msg.sender?.name || 'Unknown',
+  receiverId: msg.receiver,
+  rideId: msg.ride,
+  text: msg.text,
+  createdAt: msg.createdAt,
+}));
 
     res.json(formatted);
   } catch (err) {

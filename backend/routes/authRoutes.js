@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import validator from 'validator';
 import User from '../models/User.js';
+import auth from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
@@ -114,5 +115,10 @@ res.json({ token });
     res.status(500).send('Server error');
   }
 });
+
+router.get('/me', auth, (req, res) => {
+  res.json(req.user);
+});
+
 
 export default router;
