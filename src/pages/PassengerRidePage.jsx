@@ -13,50 +13,56 @@ const PassengerRidePage = () => {
   const socketRef = useRef(null);
   const userRef = useRef(null);
 
+  // Fetch ride, user, messages, and set up socket
   useEffect(() => {
     const fetchRideAndUser = async () => {
       try {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
 
+        // Fetch ride
         const rideRes = await axios.get(`http://localhost:5000/api/rides/${rideId}`, { headers });
         setRide(rideRes.data);
 
+        // Fetch current user
         const userRes = await axios.get(`http://localhost:5000/api/auth/me`, { headers });
         userRef.current = userRes.data;
 
+        // Fetch previous chat messages
         const msgRes = await axios.get(`http://localhost:5000/api/messages/${rideId}`, { headers });
         setMessages(msgRes.data);
 
-         socketRef.current = io('http://localhost:5000', {
-        transports: ['websocket'], // explicitly set transport
-        withCredentials: true
-      });
-    socketRef.current.emit('join_room', rideId);
+        // Set up socket connection
+        socketRef.current = io('http://localhost:5000', {
+          transports: ['websocket'],
+          withCredentials: true
+        });
 
-    socketRef.current.on('chat_message', (msg) => {
-      if (
-  msg.rideId === rideId &&
-  (msg.senderId === userRef.current._id || msg.receiverId === userRef.current._id)
-) {
-  setMessages((prev) => [...prev, msg]);
-}
-    });    
-  }
- catch (err) {
-      console.error('Error loading data:', err);
-    }
-  };
+        socketRef.current.emit('join_room', rideId);
 
-  fetchRideAndUser();
+        socketRef.current.on('chat_message', (msg) => {
+          if (
+            msg.rideId === rideId &&
+            (msg.senderId === userRef.current._id || msg.receiverId === userRef.current._id)
+          ) {
+            setMessages((prev) => [...prev, msg]);
+          }
+        });
+      } catch (err) {
+        console.error('Error loading data:', err);
+      }
+    };
 
-  return () => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
-  };
-}, [rideId]);
+    fetchRideAndUser();
 
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, [rideId]);
+
+  // Arrival countdown
   useEffect(() => {
     if (!ride?.createdAt || !ride?.driverArrivingIn) return;
 
@@ -76,21 +82,20 @@ const PassengerRidePage = () => {
   }, [ride]);
 
   const sendMessage = () => {
-  if (!newMessage.trim() || !ride || !userRef.current) return;
+    if (!newMessage.trim() || !ride || !userRef.current) return;
 
- const messageData = {
-  rideId,
-  senderId: userRef.current._id,
-  receiverId: ride.driver?._id,
-  senderName: userRef.current.name, // <-- match this to CurrentRidePage
-  text: newMessage,
-    room: rideId,
-};
+    const messageData = {
+      rideId,
+      senderId: userRef.current._id,
+      receiverId: ride.driver?._id,
+      senderName: userRef.current.name,
+      text: newMessage,
+      room: rideId,
+    };
 
-  socketRef.current.emit('chat_message', messageData);
-  setNewMessage('');
-};
-
+    socketRef.current.emit('chat_message', messageData);
+    setNewMessage('');
+  };
 
   const formatTime = (seconds) => {
     if (seconds == null || isNaN(seconds)) return 'Calculating...';
@@ -180,10 +185,9 @@ const PassengerRidePage = () => {
                 messages.map((msg, idx) => (
                   <p
                     key={idx}
-                    className={`${msg.senderId === userRef.current?._id ? 'text-right' : 'text-left'}`}
-                  >
+                    className={`${msg.senderId === userRef.current?._id ? 'text-right' : 'text-left'}`}>
                     <span className="inline-block bg-white/20 px-3 py-1 rounded">
-                      {msg.text}
+                     <strong>{msg.senderName}:</strong> {msg.text}
                     </span>
                   </p>
                 ))
@@ -191,11 +195,12 @@ const PassengerRidePage = () => {
             </div>
             <div className="flex gap-2">
               <input
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message"
-                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                className="flex-1 px-3 py-2 rounded bg-black/40 border border-white/20 text-white"
+                 type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="flex-1 p-2 rounded bg-gray-900 border border-gray-600 text-white"
+              placeholder="Type your message..."
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               />
               <button
                 onClick={sendMessage}

@@ -13,6 +13,7 @@ const CurrentRidePage = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isRideOwner, setIsRideOwner] = useState(false);
   const socketRef = useRef(null);
+  const selectedPassengerRef = useRef(null); // <-- track latest passenger
 
   const parseToken = () => {
     try {
@@ -66,32 +67,40 @@ const CurrentRidePage = () => {
     const user = parseToken();
     setCurrentUser(user);
 
-    socketRef.current = io('http://localhost:5000');
-    socketRef.current.emit('join_room', rideId);
+    const socket = io('http://localhost:5000', {
+      transports: ['websocket'],
+      withCredentials: true,
+    });
 
-    socketRef.current.on('chat_message', (msg) => {
-      const isInvolved =
-        msg.senderId === user?._id || msg.receiverId === user?._id;
-      const isCurrentChat =
-        selectedPassenger &&
-        (msg.senderId === selectedPassenger._id ||
-         msg.receiverId === selectedPassenger._id);
+    socketRef.current = socket;
 
-      if (isInvolved && isCurrentChat) {
+    socket.emit('join_room', rideId);
+
+    socket.on('chat_message', (msg) => {
+      const currentPassenger = selectedPassengerRef.current;
+      if (
+        (msg.senderId === user?._id || msg.receiverId === user?._id) &&
+        (msg.senderId === currentPassenger?._id || msg.receiverId === currentPassenger?._id)
+      ) {
         setChatMessages((prev) => [...prev, msg]);
       }
     });
 
-    socketRef.current.on('passenger_updated', async () => {
-      await fetchRide();
-    });
+    socket.on('passenger_updated', fetchRide);
 
     fetchRide();
 
     return () => {
-      socketRef.current?.disconnect();
+      socket.disconnect();
     };
-  }, [rideId, selectedPassenger]);
+  }, [rideId]);
+
+  useEffect(() => {
+    selectedPassengerRef.current = selectedPassenger;
+    if (selectedPassenger) {
+      fetchMessages(selectedPassenger._id);
+    }
+  }, [selectedPassenger]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -101,12 +110,7 @@ const CurrentRidePage = () => {
   }, []);
 
   const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
-
-    if (!currentUser || !selectedPassenger) {
-      alert('Missing sender or receiver');
-      return;
-    }
+    if (!newMessage.trim() || !currentUser || !selectedPassenger) return;
 
     const messageData = {
       rideId,
@@ -114,16 +118,16 @@ const CurrentRidePage = () => {
       senderId: currentUser._id,
       receiverId: selectedPassenger._id,
       text: newMessage.trim(),
+      room: rideId,
     };
 
     socketRef.current?.emit('chat_message', messageData);
-    setChatMessages((prev) => [...prev, messageData]);
+    setChatMessages((prev) => [...prev, messageData]); // Optional: can remove this if relying on echo
     setNewMessage('');
   };
 
   const handleOpenChat = (user) => {
     setSelectedPassenger(user);
-    fetchMessages(user._id);
   };
 
   const formatTime = (seconds) => {

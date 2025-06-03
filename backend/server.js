@@ -34,9 +34,14 @@ const app = express();
 const server = http.createServer(app);
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 // Middleware
@@ -74,28 +79,27 @@ const startServer = async () => {
         console.log(`User ${socket.id} joined room ${roomId}`);
       });
 
-      // ✅ Enhanced: Save and emit chat message
       socket.on('chat_message', async (data) => {
         try {
+           console.log('📨 Incoming chat data:', data);
           const savedMessage = await Message.create({
             ride: data.rideId,
             sender: data.senderId,
-            receiver: data.receiverId ,
+            receiver: data.receiverId,
             text: data.text,
           });
 
           const populatedMsg = await savedMessage.populate('sender', 'name');
 
-const payload = {
-  _id: savedMessage._id,
-  rideId: data.rideId,
-  senderId: populatedMsg.sender._id,
-  senderName: populatedMsg.sender.name,
-  receiverId: data.receiverId,
-  text: data.text,
-  createdAt: savedMessage.createdAt,
-};
-
+          const payload = {
+            _id: savedMessage._id,
+            rideId: data.rideId,
+            senderId: populatedMsg.sender._id,
+            senderName: populatedMsg.sender.name,
+            receiverId: data.receiverId,
+            text: data.text,
+            createdAt: savedMessage.createdAt,
+          };
 
           io.to(data.room).emit('chat_message', payload);
         } catch (err) {
@@ -104,14 +108,18 @@ const payload = {
         }
       });
 
-      // ✅ Ride Booked Notification
+      // Ride booked event
       socket.on('ride_booked', ({ rideId, byUserId, message }) => {
         console.log(`📣 Ride booked: ${rideId} by ${byUserId}`);
-        io.to(rideId).emit('ride_booked', {
+
+        const payload = {
           rideId,
           byUserId,
           message: message || 'Your ride was booked!',
-        });
+        };
+
+        io.to(rideId).emit('ride_booked', payload);
+        io.to(rideId).emit('passenger_updated'); // triggers frontend to refetch
       });
 
       socket.on('disconnect', () => {
