@@ -68,7 +68,7 @@ const CurrentRidePage = () => {
     setCurrentUser(user);
 
     const socket = io('http://localhost:5000', {
-      transports: ['websocket'],
+       transports: ['polling', 'websocket'], 
       withCredentials: true,
     });
 
@@ -115,7 +115,7 @@ const CurrentRidePage = () => {
     const messageData = {
       rideId,
       senderName: currentUser.name,
-      senderId: currentUser._id,
+      senderId: ride.driver?._id,
       receiverId: selectedPassenger._id,
       text: newMessage.trim(),
       room: rideId,
@@ -225,10 +225,12 @@ const CurrentRidePage = () => {
             </div>
             <div className="flex gap-2">
               <input
+              type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message"
-                className="flex-1 px-3 py-2 rounded bg-black/40 border border-white/20 text-white"
+                placeholder="Type your message"
+                className="flex-1 p-2 rounded bg-gray-900 border border-gray-600 text-white"
+                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               />
               <button
                 onClick={handleSendMessage}

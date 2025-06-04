@@ -34,15 +34,10 @@ const app = express();
 const server = http.createServer(app);
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: allowedOrigins,
   credentials: true,
 };
+
 
 // Middleware
 app.use(cors(corsOptions));
@@ -62,12 +57,16 @@ const startServer = async () => {
 
     // Socket.io setup
     const io = new Server(server, {
-      cors: corsOptions,
-      connectionStateRecovery: {
-        maxDisconnectionDuration: 2 * 60 * 1000,
-        skipMiddlewares: true,
-      },
-    });
+  cors: {
+    origin: allowedOrigins,
+    credentials: true,
+  },
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000,
+    skipMiddlewares: true,
+  },
+});
+
 
     app.set('io', io); // For controllers that need access to io
 

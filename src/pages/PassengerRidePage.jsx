@@ -15,52 +15,54 @@ const PassengerRidePage = () => {
 
   // Fetch ride, user, messages, and set up socket
   useEffect(() => {
-    const fetchRideAndUser = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
+  const fetchRideAndUser = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
 
-        // Fetch ride
-        const rideRes = await axios.get(`http://localhost:5000/api/rides/${rideId}`, { headers });
-        setRide(rideRes.data);
+      // Fetch ride
+      const rideRes = await axios.get(`http://localhost:5000/api/rides/${rideId}`, { headers });
+      setRide(rideRes.data);
 
-        // Fetch current user
-        const userRes = await axios.get(`http://localhost:5000/api/auth/me`, { headers });
-        userRef.current = userRes.data;
+      // Fetch current user
+      const userRes = await axios.get(`http://localhost:5000/api/auth/me`, { headers });
+      userRef.current = userRes.data;
 
-        // Fetch previous chat messages
-        const msgRes = await axios.get(`http://localhost:5000/api/messages/${rideId}`, { headers });
-        setMessages(msgRes.data);
+      // Fetch previous chat messages
+      const msgRes = await axios.get(`http://localhost:5000/api/messages/${rideId}`, { headers });
+      setMessages(msgRes.data);
 
-        // Set up socket connection
-        socketRef.current = io('http://localhost:5000', {
-          transports: ['websocket'],
-          withCredentials: true
-        });
+      // Set up socket connection
+      socketRef.current = io('http://localhost:5000', {
+        transports: ['websocket'],
+        withCredentials: true
+      });
 
-        socketRef.current.emit('join_room', rideId);
+      socketRef.current.emit('join_room', rideId);
 
-        socketRef.current.on('chat_message', (msg) => {
-          if (
-            msg.rideId === rideId &&
-            (msg.senderId === userRef.current._id || msg.receiverId === userRef.current._id)
-          ) {
-            setMessages((prev) => [...prev, msg]);
-          }
-        });
-      } catch (err) {
-        console.error('Error loading data:', err);
-      }
-    };
+      const handleMessage = (msg) => {
+        if (msg.rideId === rideId) {
+  setMessages((prev) => [...prev, msg]);
+}
+      };
 
-    fetchRideAndUser();
+      socketRef.current.on('chat_message', handleMessage);
 
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-    };
-  }, [rideId]);
+      // Cleanup listener
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.off('chat_message', handleMessage);
+          socketRef.current.disconnect();
+        }
+      };
+
+    } catch (err) {
+      console.error('Error loading data:', err);
+    }
+  };
+
+  fetchRideAndUser();
+}, [rideId]);
 
   // Arrival countdown
   useEffect(() => {
@@ -89,11 +91,12 @@ const PassengerRidePage = () => {
       senderId: userRef.current._id,
       receiverId: ride.driver?._id,
       senderName: userRef.current.name,
-      text: newMessage,
+      text: newMessage.trim(),
       room: rideId,
     };
 
     socketRef.current.emit('chat_message', messageData);
+    setMessages((prev) => [...prev, messageData]);
     setNewMessage('');
   };
 
@@ -186,9 +189,7 @@ const PassengerRidePage = () => {
                   <p
                     key={idx}
                     className={`${msg.senderId === userRef.current?._id ? 'text-right' : 'text-left'}`}>
-                    <span className="inline-block bg-white/20 px-3 py-1 rounded">
-                     <strong>{msg.senderName}:</strong> {msg.text}
-                    </span>
+                     <span className="text-green-300 font-semibold">{msg.senderName}:</span> {msg.text}
                   </p>
                 ))
               )}
