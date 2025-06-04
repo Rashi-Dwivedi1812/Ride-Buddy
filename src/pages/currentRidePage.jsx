@@ -51,6 +51,13 @@ const CurrentRidePage = () => {
     }
   };
 
+  const messagesEndRef = useRef(null);
+
+useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+}, [chatMessages]);
+
+
   const fetchMessages = async (receiverId) => {
     try {
       const token = localStorage.getItem('token');
@@ -140,8 +147,19 @@ const CurrentRidePage = () => {
   };
 
   if (ride === null) {
-  return <p className="text-center text-red-500 p-4">Ride not found or may have ended.</p>;
+  return (
+    <div className="text-center text-white mt-10">
+      <p className="text-red-400">Ride not found or may have expired.</p>
+      <button 
+        className="mt-4 px-4 py-2 bg-purple-600 rounded"
+        onClick={() => window.location.reload()}
+      >
+        Retry
+      </button>
+    </div>
+  );
 }
+
   const chatTargets = isRideOwner
     ? ride.bookedBy.filter((p) => p._id !== currentUser?._id)
     : [ride.creator];
@@ -208,14 +226,24 @@ const CurrentRidePage = () => {
         {selectedPassenger && (
           <div className="fixed bottom-4 right-4 w-96 bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-purple-500 z-50 shadow-xl">
             <div className="flex justify-between items-center mb-2">
-              <h4 className="text-white font-semibold">Chat with {selectedPassenger.name}</h4>
-              <button
-                onClick={() => setSelectedPassenger(null)}
-                className="text-red-300 font-bold"
-              >
-                ✕
-              </button>
-            </div>
+  <h4 className="text-white font-semibold">Chat with {selectedPassenger.name}</h4>
+  <div className="flex gap-2">
+    <button
+      onClick={() => fetchMessages(selectedPassenger._id)}
+      className="text-blue-300 font-bold hover:text-blue-500"
+      title="Refresh Messages"
+    >
+      ⟳
+    </button>
+    <button
+      onClick={() => setSelectedPassenger(null)}
+      className="text-red-300 font-bold hover:text-red-500"
+      title="Close Chat"
+    >
+      ✕
+    </button>
+  </div>
+</div>
             <div className="h-40 overflow-y-auto bg-black/30 text-white text-sm p-2 rounded mb-3">
               {chatMessages.length === 0 ? (
                 <p className="text-gray-400 italic">No messages yet.</p>
@@ -226,6 +254,7 @@ const CurrentRidePage = () => {
                   </p>
                 ))
               )}
+               <div ref={messagesEndRef} />
             </div>
             <div className="flex gap-2">
               <input

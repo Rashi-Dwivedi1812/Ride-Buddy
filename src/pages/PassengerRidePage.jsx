@@ -60,9 +60,10 @@ const PassengerRidePage = () => {
       };
     } catch (err) {
       console.error('Error loading data:', err);
-      if (err.response && err.response.status === 404) {
-        setRide(null);
-      }
+     if (err.response && err.response.status === 404) {
+  setRide('not_found');
+}
+
     }
   };
 
@@ -118,9 +119,19 @@ const PassengerRidePage = () => {
     return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
 
-  if (ride === null) {
-  return <p className="text-center text-red-500 p-4">Ride not found or may have ended.</p>;
+  if (ride === 'not_found') {
+  return (
+    <div className="text-center text-red-500 mt-10">
+      Ride not found or has ended. Please return to home.
+    </div>
+  );
 }
+
+if (!ride) {
+  return <div className="text-center mt-10 text-white">Loading ride details...</div>;
+}
+
+
   return (
     <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center px-4 py-10 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(#ffffff0d_1px,transparent_1px)] [background-size:20px_20px] z-0" />
