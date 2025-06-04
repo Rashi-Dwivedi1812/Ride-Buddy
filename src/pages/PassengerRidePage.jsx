@@ -15,6 +15,8 @@ const PassengerRidePage = () => {
 
   // Fetch ride, user, messages, and set up socket
   useEffect(() => {
+  let socket;
+
   const fetchRideAndUser = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -28,40 +30,50 @@ const PassengerRidePage = () => {
       const userRes = await axios.get(`http://localhost:5000/api/auth/me`, { headers });
       userRef.current = userRes.data;
 
-      // Fetch previous chat messages
+      // Fetch previous messages
       const msgRes = await axios.get(`http://localhost:5000/api/messages/${rideId}`, { headers });
       setMessages(msgRes.data);
 
-      // Set up socket connection
-      socketRef.current = io('http://localhost:5000', {
+      // Connect socket
+      socket = io('http://localhost:5000', {
         transports: ['websocket'],
-        withCredentials: true
+        reconnection: true,
+        reconnectionAttempts: 10,
+        withCredentials: true,
       });
 
-      socketRef.current.emit('join_room', rideId);
+      socket.emit('join_room', rideId);
+      socketRef.current = socket;
 
       const handleMessage = (msg) => {
         if (msg.rideId === rideId) {
-  setMessages((prev) => [...prev, msg]);
-}
-      };
-
-      socketRef.current.on('chat_message', handleMessage);
-
-      // Cleanup listener
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.off('chat_message', handleMessage);
-          socketRef.current.disconnect();
+          setMessages((prev) => [...prev, msg]);
         }
       };
 
+      socket.on('chat_message', handleMessage);
+
+      // Clean up
+      return () => {
+        socket.off('chat_message', handleMessage); // ✅ remove this specific handler
+        socket.disconnect();
+      };
     } catch (err) {
       console.error('Error loading data:', err);
+      if (err.response && err.response.status === 404) {
+        setRide(null);
+      }
     }
   };
 
-  fetchRideAndUser();
+  const cleanupPromise = fetchRideAndUser();
+
+  // cleanup runs on rideId change or unmount
+  return () => {
+    cleanupPromise.then((cleanup) => {
+      if (typeof cleanup === 'function') cleanup(); // call the inner cleanup
+    });
+  };
 }, [rideId]);
 
   // Arrival countdown
@@ -96,7 +108,6 @@ const PassengerRidePage = () => {
     };
 
     socketRef.current.emit('chat_message', messageData);
-    setMessages((prev) => [...prev, messageData]);
     setNewMessage('');
   };
 
@@ -107,8 +118,9 @@ const PassengerRidePage = () => {
     return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
 
-  if (!ride) return <p className="p-6 text-white">Loading ride...</p>;
-
+  if (ride === null) {
+  return <p className="text-center text-red-500 p-4">Ride not found or may have ended.</p>;
+}
   return (
     <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center px-4 py-10 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(#ffffff0d_1px,transparent_1px)] [background-size:20px_20px] z-0" />

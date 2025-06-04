@@ -14,7 +14,11 @@ const RideSchema = new mongoose.Schema(
       trim: true,
       minlength: [1, 'Starting location must not be empty']
     },
-
+    status: {
+  type: String,
+  enum: ['active', 'completed', 'cancelled'],
+  default: 'active',
+},
     to: {
       type: String,
       required: true,

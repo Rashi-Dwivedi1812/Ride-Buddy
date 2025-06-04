@@ -45,6 +45,9 @@ const CurrentRidePage = () => {
       }
     } catch (err) {
       console.error('Failed to fetch ride:', err);
+       if (err.response && err.response.status === 404) {
+        setRide(null); // mark ride as not found
+      }
     }
   };
 
@@ -136,8 +139,9 @@ const CurrentRidePage = () => {
     return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
 
-  if (!ride) return <p className="p-6 text-white">Loading ride...</p>;
-
+  if (ride === null) {
+  return <p className="text-center text-red-500 p-4">Ride not found or may have ended.</p>;
+}
   const chatTargets = isRideOwner
     ? ride.bookedBy.filter((p) => p._id !== currentUser?._id)
     : [ride.creator];
