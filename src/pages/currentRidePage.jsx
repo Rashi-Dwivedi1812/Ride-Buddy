@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
+import { useMemo } from 'react';
 
 const CurrentRidePage = () => {
   const { rideId } = useParams();
@@ -12,8 +13,11 @@ const CurrentRidePage = () => {
   const [newMessage, setNewMessage] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [isRideOwner, setIsRideOwner] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+
   const socketRef = useRef(null);
-  const selectedPassengerRef = useRef(null); // <-- track latest passenger
+  const selectedPassengerRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   const parseToken = () => {
     try {
@@ -24,6 +28,11 @@ const CurrentRidePage = () => {
       console.error('Invalid token:', err);
       return null;
     }
+  };
+
+  const getPrivateRoomId = (rideId, userId1, userId2) => {
+    const sorted = [userId1, userId2].sort();
+    return `ride-${rideId}-chat-${sorted[0]}-${sorted[1]}`;
   };
 
   const fetchRide = async () => {
@@ -45,21 +54,22 @@ const CurrentRidePage = () => {
       }
     } catch (err) {
       console.error('Failed to fetch ride:', err);
-       if (err.response && err.response.status === 404) {
-        setRide(null); // mark ride as not found
+      if (err.response && err.response.status === 404) {
+        setRide(null);
       }
     }
   };
-
-  const messagesEndRef = useRef(null);
-
-useEffect(() => {
-  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-}, [chatMessages]);
+const chatTargets = useMemo(() => {
+  if (!ride || !currentUser) return [];
+  return isRideOwner
+    ? ride.bookedBy.filter((p) => p._id !== currentUser._id)
+    : [ride.creator];
+}, [ride, currentUser, isRideOwner]);
 
 
   const fetchMessages = async (receiverId) => {
     try {
+      setLoadingMessages(true);
       const token = localStorage.getItem('token');
       const res = await axios.get(
         `http://localhost:5000/api/messages/${rideId}?receiverId=${receiverId}`,
@@ -70,47 +80,65 @@ useEffect(() => {
       setChatMessages(res.data);
     } catch (err) {
       console.error('Failed to fetch messages:', err);
+    } finally {
+      setLoadingMessages(false);
     }
   };
 
-  useEffect(() => {
-    const user = parseToken();
-    setCurrentUser(user);
+  // All useEffect hooks together
+useEffect(() => {
+  const user = parseToken();
+  if (!user) return;
+  setCurrentUser(user);
 
-    const socket = io('http://localhost:5000', {
-       transports: ['polling', 'websocket'], 
-      withCredentials: true,
-    });
+  const socket = io('http://localhost:5000', {
+    transports: ['polling', 'websocket'],
+    withCredentials: true,
+  });
 
-    socketRef.current = socket;
+  socketRef.current = socket;
 
-    socket.emit('join_room', rideId);
+  socket.on('private_message', (msg) => {
+    const currentPassenger = selectedPassengerRef.current;
+    const isSenderOrReceiver = [msg.senderId, msg.receiverId].includes(user._id);
+    const isWithSelected = [msg.senderId, msg.receiverId].includes(currentPassenger?._id);
 
-    socket.on('chat_message', (msg) => {
-      const currentPassenger = selectedPassengerRef.current;
-      if (
-        (msg.senderId === user?._id || msg.receiverId === user?._id) &&
-        (msg.senderId === currentPassenger?._id || msg.receiverId === currentPassenger?._id)
-      ) {
-        setChatMessages((prev) => [...prev, msg]);
-      }
-    });
-
-    socket.on('passenger_updated', fetchRide);
-
-    fetchRide();
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [rideId]);
-
-  useEffect(() => {
-    selectedPassengerRef.current = selectedPassenger;
-    if (selectedPassenger) {
-      fetchMessages(selectedPassenger._id);
+    if (msg.rideId === rideId && isSenderOrReceiver && isWithSelected) {
+      setChatMessages((prev) => [...prev, msg]);
     }
-  }, [selectedPassenger]);
+  });
+
+  socket.on('passenger_updated', () => {
+    fetchRide();
+  });
+
+  if (rideId) {
+    socket.emit('join_room', rideId);
+  }
+
+  fetchRide();
+
+  return () => {
+    socket.disconnect();
+  };
+}, [rideId]);
+
+
+  useEffect(() => {
+  if (!selectedPassenger || !currentUser) return;
+
+  selectedPassengerRef.current = selectedPassenger;
+
+  const roomId = getPrivateRoomId(rideId, currentUser._id, selectedPassenger._id);
+  socketRef.current?.emit('join_private_chat', {
+    room: roomId,
+    rideId,
+    userId1: currentUser._id,
+    userId2: selectedPassenger._id,
+  });
+  fetchMessages(selectedPassenger._id);
+}, [selectedPassenger, currentUser]);
+
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -119,20 +147,24 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
   const handleSendMessage = () => {
     if (!newMessage.trim() || !currentUser || !selectedPassenger) return;
 
+    const roomId = getPrivateRoomId(rideId, currentUser._id, selectedPassenger._id);
     const messageData = {
       rideId,
       senderName: currentUser.name,
       senderId: ride.driver?._id,
       receiverId: selectedPassenger._id,
       text: newMessage.trim(),
-      room: rideId,
+      room: roomId,
     };
 
-    socketRef.current?.emit('chat_message', messageData);
-    setChatMessages((prev) => [...prev, messageData]); // Optional: can remove this if relying on echo
+    socketRef.current?.emit('private_message', messageData);
     setNewMessage('');
   };
 
@@ -145,24 +177,26 @@ useEffect(() => {
     const secs = seconds % 60;
     return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
+useEffect(() => {
+  if (selectedPassenger && !chatTargets.find((u) => u._id === selectedPassenger._id)) {
+    setSelectedPassenger(null);
+  }
+}, [chatTargets]);
 
   if (ride === null) {
-  return (
-    <div className="text-center text-white mt-10">
-      <p className="text-red-400">Ride not found or may have expired.</p>
-      <button 
-        className="mt-4 px-4 py-2 bg-purple-600 rounded"
-        onClick={() => window.location.reload()}
-      >
-        Retry
-      </button>
-    </div>
-  );
-}
+    return (
+      <div className="text-center text-white mt-10">
+        <p className="text-red-400">Ride not found or may have expired.</p>
+        <button
+          className="mt-4 px-4 py-2 bg-purple-600 rounded"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
-  const chatTargets = isRideOwner
-    ? ride.bookedBy.filter((p) => p._id !== currentUser?._id)
-    : [ride.creator];
 
   return (
     <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center px-4 py-10 relative overflow-hidden">
@@ -198,7 +232,7 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Passengers / Chat Targets */}
+        {/* Chat Targets */}
         <div className="group relative w-full bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/20 hover:shadow-[0_0_30px_#8b5cf6] hover:scale-[1.01] hover:border-purple-400 transition-all duration-300">
           <h3 className="text-xl font-semibold text-white mb-4">
             {isRideOwner ? '🧍‍♂️ Passengers' : '💬 Chat with Ride Owner'}
@@ -226,26 +260,28 @@ useEffect(() => {
         {selectedPassenger && (
           <div className="fixed bottom-4 right-4 w-96 bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-purple-500 z-50 shadow-xl">
             <div className="flex justify-between items-center mb-2">
-  <h4 className="text-white font-semibold">Chat with {selectedPassenger.name}</h4>
-  <div className="flex gap-2">
-    <button
-      onClick={() => fetchMessages(selectedPassenger._id)}
-      className="text-blue-300 font-bold hover:text-blue-500"
-      title="Refresh Messages"
-    >
-      ⟳
-    </button>
-    <button
-      onClick={() => setSelectedPassenger(null)}
-      className="text-red-300 font-bold hover:text-red-500"
-      title="Close Chat"
-    >
-      ✕
-    </button>
-  </div>
-</div>
+              <h4 className="text-white font-semibold">Chat with {selectedPassenger.name}</h4>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fetchMessages(selectedPassenger._id)}
+                  className="text-blue-300 font-bold hover:text-blue-500"
+                  title="Refresh Messages"
+                >
+                  ⟳
+                </button>
+                <button
+                  onClick={() => setSelectedPassenger(null)}
+                  className="text-red-300 font-bold hover:text-red-500"
+                  title="Close Chat"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
             <div className="h-40 overflow-y-auto bg-black/30 text-white text-sm p-2 rounded mb-3">
-              {chatMessages.length === 0 ? (
+              {loadingMessages ? (
+                <p className="text-gray-400 italic">Loading...</p>
+              ) : chatMessages.length === 0 ? (
                 <p className="text-gray-400 italic">No messages yet.</p>
               ) : (
                 chatMessages.map((msg, idx) => (
@@ -254,11 +290,11 @@ useEffect(() => {
                   </p>
                 ))
               )}
-               <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} />
             </div>
             <div className="flex gap-2">
               <input
-              type="text"
+                type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type your message"

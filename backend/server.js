@@ -7,7 +7,6 @@ import cors from 'cors';
 import connectDB from './config/db.js';
 import path from 'path';
 
-// Route Imports
 import authRoutes from './routes/authRoutes.js';
 import rideRoutes from './routes/rideRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
@@ -24,12 +23,10 @@ requiredEnv.forEach((env) => {
   }
 });
 
-// Default to localhost:5173 if ALLOWED_ORIGINS not set
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:5173'];
 
-// Express setup
 const app = express();
 const server = http.createServer(app);
 
@@ -38,49 +35,89 @@ const corsOptions = {
   credentials: true,
 };
 
-
-// Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/api/upload', uploadRoutes);
 app.use('/uploads', express.static(path.resolve('uploads')));
 
-// Connect to DB and start server
+// Helper: Generate unique private room ID
+const getPrivateRoomId = (rideId, userId1, userId2) =>
+  [rideId, userId1, userId2].sort().join('_');
+
 const startServer = async () => {
   try {
     await connectDB();
 
-    // Routes
     app.use('/api/auth', authRoutes);
     app.use('/api/rides', rideRoutes);
     app.use('/api/messages', chatRoutes);
 
-    // Socket.io setup
     const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    credentials: true,
-  },
-  connectionStateRecovery: {
-    maxDisconnectionDuration: 2 * 60 * 1000,
-    skipMiddlewares: true,
-  },
-});
+      cors: {
+        origin: allowedOrigins,
+        credentials: true,
+      },
+      connectionStateRecovery: {
+        maxDisconnectionDuration: 2 * 60 * 1000,
+        skipMiddlewares: true,
+      },
+    });
 
-
-    app.set('io', io); // For controllers that need access to io
+    app.set('io', io);
 
     io.on('connection', (socket) => {
       console.log(`⚡ New client connected: ${socket.id}`);
 
+      // Join public ride chat room
       socket.on('join_room', (roomId) => {
         socket.join(roomId);
         console.log(`User ${socket.id} joined room ${roomId}`);
       });
 
+      // Join private 1-on-1 chat room
+      socket.on('join_private_chat', ({ rideId, userId1, userId2 }) => {
+        const roomId = getPrivateRoomId(rideId, userId1, userId2);
+        socket.join(roomId);
+        console.log(`🔒 User ${socket.id} joined private room ${roomId}`);
+      });
+
+      // Handle private message
+      // Handle private message
+socket.on('private_message', async (data) => {
+  const roomId = getPrivateRoomId(data.rideId, data.senderId, data.receiverId);
+  try {
+    // Save to DB
+    const savedMessage = await Message.create({
+      ride: data.rideId,
+      sender: data.senderId,
+      receiver: data.receiverId,
+      text: data.text,
+    });
+
+    const populatedMsg = await savedMessage.populate('sender', 'name');
+
+    const payload = {
+      _id: savedMessage._id,
+      rideId: data.rideId,
+      senderId: populatedMsg.sender._id,
+      senderName: populatedMsg.sender.name,
+      receiverId: data.receiverId,
+      text: data.text,
+      createdAt: savedMessage.createdAt,
+    };
+
+    io.to(roomId).emit('private_message', payload);
+  } catch (err) {
+    console.error('❌ Error saving private message:', err);
+    socket.emit('message_error', { error: err.message });
+  }
+});
+
+
+      // Handle public ride chat message
       socket.on('chat_message', async (data) => {
         try {
-           console.log('📨 Incoming chat data:', data);
+          console.log('📨 Incoming chat data:', data);
           const savedMessage = await Message.create({
             ride: data.rideId,
             sender: data.senderId,
@@ -107,7 +144,7 @@ const startServer = async () => {
         }
       });
 
-      // Ride booked event
+      // Ride booked notification
       socket.on('ride_booked', ({ rideId, byUserId, message }) => {
         console.log(`📣 Ride booked: ${rideId} by ${byUserId}`);
 
@@ -118,7 +155,7 @@ const startServer = async () => {
         };
 
         io.to(rideId).emit('ride_booked', payload);
-        io.to(rideId).emit('passenger_updated'); // triggers frontend to refetch
+        io.to(rideId).emit('passenger_updated');
       });
 
       socket.on('disconnect', () => {
@@ -126,12 +163,18 @@ const startServer = async () => {
       });
     });
 
-    // Start server
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌐 Allowed origins: ${allowedOrigins.join(', ')}`);
     });
+
+    // Optional: Graceful shutdown
+    process.on('SIGINT', () => {
+      console.log('🛑 Gracefully shutting down...');
+      server.close(() => process.exit(0));
+    });
+
   } catch (error) {
     console.error('❌ Server startup failed:', error);
     process.exit(1);
