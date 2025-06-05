@@ -114,7 +114,7 @@ const MyRidesPage = () => {
 
       {/* Heading */}
       <h2 className="z-10 text-4xl font-extrabold mb-8 text-white drop-shadow text-center">
-        🚗 My Rides
+        🚗 Recent Rides
       </h2>
 
       {/* Rides List */}
