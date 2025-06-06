@@ -2,12 +2,15 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import io from 'socket.io-client';
 import { toast } from 'react-toastify';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const MyRidesPage = () => {
   const [rides, setRides] = useState([]);
   const [countdowns, setCountdowns] = useState({});
   const [showImageRideId, setShowImageRideId] = useState(null);
   const socketRef = useRef(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -24,18 +27,17 @@ const MyRidesPage = () => {
     return diffSeconds > 0 ? diffSeconds : 0;
   };
 
-  const fetchMyRides = async () => {
+  const fetchMyRides = async (userId) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/rides', {
+      const res = await axios.get('http://localhost:5000/api/rides/mine', {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setRides(res.data);
+      // Double filter to make absolutely sure
+      const filteredRides = res.data.filter((ride) => ride.driver._id === userId);
 
-      res.data.forEach((ride) => {
-        socketRef.current.emit('join_room', ride._id);
-      });
+      setRides(filteredRides);
 
       const initialCountdowns = {};
       res.data.forEach((ride) => {
@@ -55,15 +57,26 @@ const MyRidesPage = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
+    const decoded = JSON.parse(atob(token.split('.')[1]));
+    const userId = decoded.id || decoded._id;
+
     socketRef.current = io('http://localhost:5000');
+    socketRef.current.emit('join_driver_room', userId); // only driver's own room
+
     fetchMyRides();
 
-    socketRef.current.on('ride_booked', ({ rideId, message }) => {
+    // Handle real-time booking notifications
+    socketRef.current.on('ride_booked', ({ rideId, byUserId, message, driverId }) => {
+      if (String(driverId) !== String(userId)) return;
+
       toast.info(message || `Someone booked your ride (${rideId})`);
       fetchMyRides();
-      setTimeout(() => {
-        window.location.href = `/current-ride/${rideId}`;
-      }, 1000);
+
+      if (!location.pathname.includes(`/current-ride/${rideId}`)) {
+        setTimeout(() => {
+          navigate(`/current-ride/${rideId}`);
+        }, 1000);
+      }
     });
 
     return () => {
@@ -89,11 +102,9 @@ const MyRidesPage = () => {
 
   return (
     <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center px-4 py-10 relative overflow-hidden">
-      {/* Background grid & blur */}
       <div className="absolute inset-0 bg-[radial-gradient(#ffffff0d_1px,transparent_1px)] [background-size:20px_20px] z-0" />
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-700 opacity-10 blur-2xl z-0" />
 
-      {/* Modal */}
       {showImageRideId && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="bg-black p-4 rounded-lg shadow-lg relative max-w-4xl w-full">
@@ -112,12 +123,10 @@ const MyRidesPage = () => {
         </div>
       )}
 
-      {/* Heading */}
       <h2 className="z-10 text-4xl font-extrabold mb-8 text-white drop-shadow text-center">
         🚗 Recent Rides
       </h2>
 
-      {/* Rides List */}
       <div className="z-10 w-full max-w-4xl space-y-6">
         {rides.length === 0 ? (
           <p className="text-gray-400 text-center">You haven't posted any rides yet.</p>

@@ -60,43 +60,45 @@ const FindRidePage = () => {
   };
 
   const handleAccept = async (rideId) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return alert('Please log in first.');
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return alert('Please log in first.');
 
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const userId = payload.id;
-      const userName = payload.name;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const userId = payload.id;
+    const userName = payload.name;
 
-      const res = await axios.post(
-        `http://localhost:5000/api/rides/${rideId}/accept`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
+    const res = await axios.post(
+      `http://localhost:5000/api/rides/${rideId}/accept`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    const updatedRide = res.data;
+
+    // Emit to ride owner only
+    socketRef.current.emit('ride_booked', {
+      rideId,
+      byUserId: userId,
+      driverId: updatedRide.driver._id, // Include this!
+      message: `${userName || 'Someone'} accepted your ride.`,
+    });
+
+    if (updatedRide.seatsAvailable === 0) {
+      setRides(prev => prev.filter(ride => ride._id !== rideId));
+    } else {
+      setRides(prev =>
+        prev.map(ride => (ride._id === rideId ? updatedRide : ride))
       );
-
-      const updatedRide = res.data;
-
-      socketRef.current.emit('ride_booked', {
-        rideId,
-        byUserId: userId,
-        message: `${userName || 'Someone'} accepted your ride.`,
-      });
-
-      if (updatedRide.seatsAvailable === 0) {
-        setRides(prev => prev.filter(ride => ride._id !== rideId));
-      } else {
-        setRides(prev =>
-          prev.map(ride => (ride._id === rideId ? updatedRide : ride))
-        );
-      }
-
-      navigate(`/passenger-ride/${rideId}`);
-    } catch (error) {
-      const errMsg = error.response?.data?.msg || 'Failed to accept ride.';
-      alert(`❌ ${errMsg}`);
-      console.error('Accept ride error:', err);
     }
-  };
+
+    navigate(`/passenger-ride/${rideId}`);
+  } catch (error) {
+    const errMsg = error.response?.data?.msg || 'Failed to accept ride.';
+    alert(`❌ ${errMsg}`);
+    console.error('Accept ride error:', err);
+  }
+};
 
   const handleReject = async (rideId) => {
     try {

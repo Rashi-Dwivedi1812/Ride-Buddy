@@ -1,4 +1,4 @@
-// routes/rides.js
+// routes/rideRoutes.js
 
 import express from 'express';
 import Ride from '../models/Ride.js';
@@ -27,11 +27,13 @@ const bookRide = async (ride, user, io) => {
     .populate('bookedBy', 'name');
 
   if (io && ride._id) {
-    io.to(ride._id.toString()).emit('ride_booked', {
-      rideId: ride._id,
-      byUserId: user._id,
-      message: `${user.name} booked your ride`,
-    });
+    io.to(`driver_${ride.driver._id}`).emit('ride_booked', {
+  rideId: ride._id,
+  byUserId: user._id,
+  driverId: ride.driver._id, // ✅ Add this
+  message: `${user.name} booked your ride`,
+});
+
     io.to(ride._id.toString()).emit('passenger_updated', {
       rideId: ride._id,
       passengers: populated.bookedBy,
@@ -45,35 +47,56 @@ const bookRide = async (ride, user, io) => {
 // POST /api/rides - Create a ride
 // -------------------------
 router.post('/', auth, async (req, res) => {
-  const { from, to, date, driverArrivingIn, seatsAvailable, costPerPerson, cabScreenshotUrl } = req.body;
-
-  if (!from || !to || !date || !driverArrivingIn || !seatsAvailable || !costPerPerson) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
   try {
-    const newRide = new Ride({
-      driver: req.user,
+     console.log('👉 Authenticated user:', req.user);
+    const userId = req.user.id;
+    const { from, to, date, driverArrivingIn, seatsAvailable, costPerPerson, cabScreenshotUrl } = req.body;
+
+    if (!from || !to || !date || !driverArrivingIn || !seatsAvailable || !costPerPerson) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const ride = new Ride({
       from,
       to,
       date,
       driverArrivingIn,
-      seatsAvailable,
-      initialSeats: seatsAvailable,
+      seatsAvailable: parseInt(seatsAvailable),
+      initialSeats: parseInt(seatsAvailable),
       costPerPerson,
       cabScreenshotUrl,
+      driver: userId, // ✅ key line: set driver from auth token
     });
 
-    const savedRide = await newRide.save();
-    res.json(savedRide);
+    await ride.save();
+    const populatedRide = await ride.populate('driver', 'name');
+    res.status(201).json(populatedRide);
   } catch (err) {
-    console.error('Error creating ride:', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('❌ Failed to create ride:', err); // 👈 log full error
+    res.status(500).json({ msg: 'Failed to create ride.', error: err.message }); // 👈 send message to client
   }
 });
 
 // -------------------------
-// GET /api/rides - List rides
+// GET /api/rides/mine - User's posted rides
+// -------------------------
+router.get('/mine', auth, async (req, res) => {
+  try {
+    console.log("✅ /mine requested by user:", req.user);
+
+    const rides = await Ride.find({ driver: req.user._id })
+      .populate('bookedBy', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.json(rides);
+  } catch (error) {
+    console.error('❌ Error in /api/rides/mine:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// -------------------------
+// GET /api/rides - List all rides
 // -------------------------
 router.get('/', async (req, res) => {
   try {
@@ -94,7 +117,7 @@ router.get('/', async (req, res) => {
 
     res.json(rides);
   } catch (err) {
-    console.error('Error fetching rides:', err);
+    console.error('❌ Error fetching rides:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -109,9 +132,10 @@ router.get('/:id', async (req, res) => {
       .populate('bookedBy', 'name');
 
     if (!ride) return res.status(404).json({ error: 'Ride not found' });
+
     res.json(ride);
   } catch (err) {
-    console.error('Error fetching ride:', err);
+    console.error('❌ Error fetching ride:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -126,15 +150,16 @@ router.post('/:id/book', auth, async (req, res) => {
 
     const io = req.app.get('io');
     const updatedRide = await bookRide(ride, req.user, io);
+
     res.json({ msg: 'Seat booked successfully', ride: updatedRide });
   } catch (err) {
-    console.error('Book ride error:', err.message);
+    console.error('❌ Book ride error:', err.message);
     res.status(400).json({ error: err.message });
   }
 });
 
 // -------------------------
-// POST /api/rides/:rideId/accept - Accept ride (duplicate booking handler)
+// POST /api/rides/:rideId/accept - Accept ride request
 // -------------------------
 router.post('/:rideId/accept', auth, async (req, res) => {
   try {
@@ -143,42 +168,26 @@ router.post('/:rideId/accept', auth, async (req, res) => {
 
     const io = req.app.get('io');
     const updatedRide = await bookRide(ride, req.user, io);
-    res.json(updatedRide);
+
+    res.json(updatedRide); // ✅ Make sure this is sending correct ride data
   } catch (err) {
-    console.error('Accept ride error:', err.message);
+    console.error('❌ Accept ride error:', err.message);
     res.status(400).json({ error: err.message });
   }
 });
 
 // -------------------------
-// POST /api/rides/:id/reject - Reject a ride (placeholder)
+// POST /api/rides/:id/reject - Reject a ride (stub)
 // -------------------------
 router.post('/:id/reject', auth, async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ error: 'Ride not found' });
 
-    // TODO: Add rejection tracking logic here
+    // TODO: Add actual rejection tracking if needed
     res.json({ msg: 'Ride rejected' });
   } catch (err) {
-    console.error('Reject ride error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// -------------------------
-// GET /api/rides/mine - Get user's posted rides
-// -------------------------
-router.get('/mine', auth, async (req, res) => {
-  try {
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const rides = await Ride.find({ driver: req.user._id }).sort({ createdAt: -1 });
-    res.json(rides);
-  } catch (err) {
-    console.error('Error fetching user rides:', err);
+    console.error('❌ Reject ride error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

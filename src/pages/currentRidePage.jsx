@@ -161,7 +161,7 @@ const CurrentRidePage = () => {
   }
 const chatTargets = isRideOwner
     ? ride.bookedBy.filter((p) => p._id !== currentUser?._id)
-    : [ride.creator];
+    : [ride.driver];
   return (
     <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center px-4 py-10 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(#ffffff0d_1px,transparent_1px)] [background-size:20px_20px] z-0" />

@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -14,7 +15,6 @@ import uploadRoutes from './routes/uploadRoutes.js';
 
 import Message from './models/Message.js';
 
-// Validate required env vars
 const requiredEnv = ['MONGO_URI', 'JWT_SECRET'];
 requiredEnv.forEach((env) => {
   if (!process.env[env]) {
@@ -48,10 +48,7 @@ const startServer = async () => {
   try {
     await connectDB();
 
-    app.use('/api/auth', authRoutes);
-    app.use('/api/rides', rideRoutes);
-    app.use('/api/messages', chatRoutes);
-
+    // Socket.io setup
     const io = new Server(server, {
       cors: {
         origin: allowedOrigins,
@@ -63,61 +60,34 @@ const startServer = async () => {
       },
     });
 
+    // Make io accessible from req.app.get('io') inside controllers
     app.set('io', io);
 
+    // REST API routes
+    app.use('/api/auth', authRoutes);
+    app.use('/api/rides', rideRoutes);
+    app.use('/api/messages', chatRoutes);
+
+    // Socket.io connection
     io.on('connection', (socket) => {
       console.log(`⚡ New client connected: ${socket.id}`);
 
-      // Join public ride chat room
+      // Join ride chat room
       socket.on('join_room', (roomId) => {
         socket.join(roomId);
-        console.log(`User ${socket.id} joined room ${roomId}`);
+        console.log(`User ${socket.id} joined public room ${roomId}`);
       });
 
-      // Join private 1-on-1 chat room
-      socket.on('join_private_chat', ({ rideId, userId1, userId2 }) => {
-        const roomId = getPrivateRoomId(rideId, userId1, userId2);
-        socket.join(roomId);
-        console.log(`🔒 User ${socket.id} joined private room ${roomId}`);
+      // Join driver notification room
+      socket.on('join_driver_room', (driverId) => {
+        socket.join(`driver_${driverId}`);
+        console.log(`🚕 Driver ${driverId} joined room driver_${driverId}`);
       });
 
-      // Handle private message
-      // Handle private message
-socket.on('private_message', async (data) => {
-  const roomId = getPrivateRoomId(data.rideId, data.senderId, data.receiverId);
-  try {
-    // Save to DB
-    const savedMessage = await Message.create({
-      ride: data.rideId,
-      sender: data.senderId,
-      receiver: data.receiverId,
-      text: data.text,
-    });
-
-    const populatedMsg = await savedMessage.populate('sender', 'name');
-
-    const payload = {
-      _id: savedMessage._id,
-      rideId: data.rideId,
-      senderId: populatedMsg.sender._id,
-      senderName: populatedMsg.sender.name,
-      receiverId: data.receiverId,
-      text: data.text,
-      createdAt: savedMessage.createdAt,
-    };
-
-    io.to(roomId).emit('private_message', payload);
-  } catch (err) {
-    console.error('❌ Error saving private message:', err);
-    socket.emit('message_error', { error: err.message });
-  }
-});
-
-
-      // Handle public ride chat message
-      socket.on('chat_message', async (data) => {
+      // ========== Private Message (1:1) ==========
+      socket.on('private_message', async (data) => {
+        const roomId = getPrivateRoomId(data.rideId, data.senderId, data.receiverId);
         try {
-          console.log('📨 Incoming chat data:', data);
           const savedMessage = await Message.create({
             ride: data.rideId,
             sender: data.senderId,
@@ -126,7 +96,34 @@ socket.on('private_message', async (data) => {
           });
 
           const populatedMsg = await savedMessage.populate('sender', 'name');
+          const payload = {
+            _id: savedMessage._id,
+            rideId: data.rideId,
+            senderId: populatedMsg.sender._id,
+            senderName: populatedMsg.sender.name,
+            receiverId: data.receiverId,
+            text: data.text,
+            createdAt: savedMessage.createdAt,
+          };
 
+          io.to(roomId).emit('private_message', payload);
+        } catch (err) {
+          console.error('❌ Error saving private message:', err);
+          socket.emit('message_error', { error: err.message });
+        }
+      });
+
+      // ========== Public Chat Message (Ride Room) ==========
+      socket.on('chat_message', async (data) => {
+        try {
+          const savedMessage = await Message.create({
+            ride: data.rideId,
+            sender: data.senderId,
+            receiver: data.receiverId,
+            text: data.text,
+          });
+
+          const populatedMsg = await savedMessage.populate('sender', 'name');
           const payload = {
             _id: savedMessage._id,
             rideId: data.rideId,
@@ -144,20 +141,7 @@ socket.on('private_message', async (data) => {
         }
       });
 
-      // Ride booked notification
-      socket.on('ride_booked', ({ rideId, byUserId, message }) => {
-        console.log(`📣 Ride booked: ${rideId} by ${byUserId}`);
-
-        const payload = {
-          rideId,
-          byUserId,
-          message: message || 'Your ride was booked!',
-        };
-
-        io.to(rideId).emit('ride_booked', payload);
-        io.to(rideId).emit('passenger_updated');
-      });
-
+      // Clean up
       socket.on('disconnect', () => {
         console.log(`🚫 Client disconnected: ${socket.id}`);
       });
@@ -169,7 +153,6 @@ socket.on('private_message', async (data) => {
       console.log(`🌐 Allowed origins: ${allowedOrigins.join(', ')}`);
     });
 
-    // Optional: Graceful shutdown
     process.on('SIGINT', () => {
       console.log('🛑 Gracefully shutting down...');
       server.close(() => process.exit(0));

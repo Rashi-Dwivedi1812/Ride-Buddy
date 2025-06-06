@@ -70,7 +70,8 @@ const RideSchema = new mongoose.Schema(
     bookedBy: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'User',
+          default: []
       }
     ]
   },
