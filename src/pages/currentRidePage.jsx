@@ -77,8 +77,17 @@ const CurrentRidePage = () => {
     setCurrentUser(user);
 
     const socket = io('http://localhost:5000', {
-      transports: ['polling', 'websocket'],
-      withCredentials: true,
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 90000, // 1.5 minutes timeout
+      autoConnect: true,
+      forceNew: true,
+      auth: {
+        token: localStorage.getItem('token')
+      }
     });
 
     socketRef.current = socket;
@@ -145,17 +154,18 @@ const CurrentRidePage = () => {
     return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
   
-
   if (ride === null) {
     return (
-      <div className="text-center text-white mt-10">
-        <p className="text-red-400">Ride not found or may have expired.</p>
-        <button
-          className="mt-4 px-4 py-2 bg-purple-600 rounded"
-          onClick={() => window.location.reload()}
+      <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center justify-center px-4">
+        <div className="text-center text-red-400 mb-4">
+          Ride not found or has ended.
+        </div>
+        <a 
+          href="/my-rides" 
+          className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-xl text-white transition-all"
         >
-          Retry
-        </button>
+          ← Back to My Rides
+        </a>
       </div>
     );
   }

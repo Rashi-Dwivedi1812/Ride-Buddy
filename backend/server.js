@@ -46,18 +46,19 @@ const getPrivateRoomId = (rideId, userId1, userId2) =>
 
 const startServer = async () => {
   try {
-    await connectDB();
-
-    // Socket.io setup
+    await connectDB();    // Socket.io setup
     const io = new Server(server, {
       cors: {
         origin: allowedOrigins,
         credentials: true,
       },
+      pingTimeout: 60000, // 1 minute ping timeout
+      pingInterval: 25000, // 25 second ping interval
       connectionStateRecovery: {
-        maxDisconnectionDuration: 2 * 60 * 1000,
+        maxDisconnectionDuration: 2 * 60 * 60 * 1000, // 2 hours max disconnection
         skipMiddlewares: true,
       },
+      transports: ['websocket', 'polling'] // prefer websocket
     });
 
     // Make io accessible from req.app.get('io') inside controllers
@@ -66,11 +67,14 @@ const startServer = async () => {
     // REST API routes
     app.use('/api/auth', authRoutes);
     app.use('/api/rides', rideRoutes);
-    app.use('/api/messages', chatRoutes);
-
-    // Socket.io connection
+    app.use('/api/messages', chatRoutes);    // Socket.io connection
     io.on('connection', (socket) => {
       console.log(`⚡ New client connected: ${socket.id}`);
+
+      // Handle connection errors
+      socket.on('error', (error) => {
+        console.error('Socket error:', error);
+      });
 
       // Join ride chat room
       socket.on('join_room', (roomId) => {

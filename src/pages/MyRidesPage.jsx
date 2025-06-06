@@ -30,14 +30,13 @@ const MyRidesPage = () => {
   const fetchMyRides = async (userId) => {
     try {
       const token = localStorage.getItem('token');
+      console.log('🔍 Fetching rides for user:', userId);
       const res = await axios.get('http://localhost:5000/api/rides/mine', {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      // Double filter to make absolutely sure
-      const filteredRides = res.data.filter((ride) => ride.driver._id === userId);
-
-      setRides(filteredRides);
+      console.log('📦 Raw response data:', res.data);      // We don't need to filter since the backend already filters by driver
+      console.log('✨ Rides:', res.data);
+      setRides(res.data);
 
       const initialCountdowns = {};
       res.data.forEach((ride) => {
@@ -47,9 +46,12 @@ const MyRidesPage = () => {
         }
       });
 
-      setCountdowns(initialCountdowns);
-    } catch (err) {
+      setCountdowns(initialCountdowns);    } catch (err) {
       console.error('❌ Failed to fetch my rides:', err);
+      const errorMessage = err.response?.data?.message || 'Failed to fetch rides. Please try again.';
+      toast.error(errorMessage);
+      // Set empty rides array to show the "no rides" message
+      setRides([]);
     }
   };
 
@@ -59,30 +61,93 @@ const MyRidesPage = () => {
 
     const decoded = JSON.parse(atob(token.split('.')[1]));
     const userId = decoded.id || decoded._id;
+    console.log('👤 User ID:', userId);
 
-    socketRef.current = io('http://localhost:5000');
-    socketRef.current.emit('join_driver_room', userId); // only driver's own room
+    socketRef.current = io('http://localhost:5000', {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 90000, // 1.5 minutes timeout
+      autoConnect: true,
+      forceNew: true,
+      auth: {
+        token
+      }
+    });
 
-    fetchMyRides();
+    // Initial fetch - don't wait for socket connection
+    console.log('🔄 Initial fetch');
+    fetchMyRides(userId);
+
+    // Add connection event handlers
+    socketRef.current.on('connect', () => {
+      console.log('✅ Socket connected');
+      socketRef.current.emit('join_driver_room', userId);
+    });
+
+    socketRef.current.on('reconnect', (attempt) => {
+      console.log('🔄 Socket reconnected after', attempt, 'attempts');
+      socketRef.current.emit('join_driver_room', userId);
+      fetchMyRides(userId); // Refresh data after reconnect
+    });
+
+    socketRef.current.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error);
+      toast.error('Connection error. Retrying...');
+    });
 
     // Handle real-time booking notifications
-    socketRef.current.on('ride_booked', ({ rideId, byUserId, message, driverId }) => {
-      if (String(driverId) !== String(userId)) return;
+    socketRef.current.on('ride_booked', async ({ rideId, byUserId, message, driverId, ride }) => {
+      console.log('🎯 Received ride_booked event:', { rideId, byUserId, message, driverId, ride });
+      
+      // Only handle booking notifications for rides owned by the current user
+      if (String(driverId) !== String(userId)) {
+        console.log('❌ Not the ride owner, ignoring event');
+        return;
+      }
 
-      toast.info(message || `Someone booked your ride (${rideId})`);
-      fetchMyRides();
+      // Show notification
+      toast.success(message || `Someone booked your ride!`);
+      
+      // Navigate BEFORE updating state to ensure it happens
+      console.log('🚗 Navigating to:', `/current-ride/${rideId}`);
+      navigate(`/current-ride/${rideId}`, { replace: true });
+      
+      // Then update rides list with new data
+      setRides(prev => prev.map(r => r._id === rideId ? ride : r));
+    });
 
-      if (!location.pathname.includes(`/current-ride/${rideId}`)) {
-        setTimeout(() => {
-          navigate(`/current-ride/${rideId}`);
-        }, 1000);
+    // Handle ride updates (new rides, modifications)
+    socketRef.current.on('ride_update', ({ driverId: updatedDriverId, action, ride }) => {
+      // Only update if the update is for the current user's rides
+      if (String(updatedDriverId) === String(userId)) {
+        if (action === 'create') {
+          console.log('✅ Received new ride:', ride);
+          setRides(prev => [...prev, ride]);
+          
+          // Always set countdown for new rides
+          const timeLeft = calculateCountdown(ride);
+          setCountdowns(prev => ({ ...prev, [ride._id]: timeLeft }));
+        } else {
+          // For other updates, fetch all rides to ensure consistency
+          fetchMyRides(userId);
+        }
       }
     });
 
     return () => {
-      socketRef.current.disconnect();
+      if (socketRef.current) {
+        socketRef.current.off('connect');
+        socketRef.current.off('reconnect');
+        socketRef.current.off('connect_error');
+        socketRef.current.off('ride_booked');
+        socketRef.current.off('ride_update');
+        socketRef.current.disconnect();
+      }
     };
-  }, []);
+  }, [navigate, location.pathname]);
 
   useEffect(() => {
     const interval = setInterval(() => {

@@ -10,37 +10,48 @@ const router = express.Router();
 // Shared booking logic
 // -------------------------
 const bookRide = async (ride, user, io) => {
-  if (ride.seatsAvailable <= 0) {
-    throw new Error('No seats available');
+  try {
+    if (ride.seatsAvailable <= 0) {
+      throw new Error('No seats available');
+    }
+
+    if (ride.bookedBy.some(u => u.toString() === user._id.toString())) {
+      throw new Error('Already booked this ride');
+    }
+
+    ride.bookedBy.push(user._id);
+    ride.seatsAvailable -= 1;
+    await ride.save();
+
+    const populated = await Ride.findById(ride._id)
+      .populate('driver', 'name')
+      .populate('bookedBy', 'name');
+
+    if (io && ride._id) {
+      console.log('📢 Emitting ride_booked event to driver:', ride.driver._id);
+      const eventData = {
+        rideId: ride._id,
+        byUserId: user._id,
+        driverId: ride.driver._id,
+        message: `${user.name} booked your ride`,
+        ride: populated
+      };
+      console.log('📦 Event data:', eventData);
+      
+      io.to(`driver_${ride.driver._id}`).emit('ride_booked', eventData);
+      
+      // Also emit passenger update
+      io.to(ride._id.toString()).emit('passenger_updated', {
+        rideId: ride._id,
+        passengers: populated.bookedBy
+      });
+    }
+
+    return populated;
+  } catch (error) {
+    console.error('❌ Error in bookRide:', error);
+    throw error;
   }
-
-  if (ride.bookedBy.some(u => u.toString() === user._id.toString())) {
-    throw new Error('Already booked this ride');
-  }
-
-  ride.bookedBy.push(user._id);
-  ride.seatsAvailable -= 1;
-  await ride.save();
-
-  const populated = await Ride.findById(ride._id)
-    .populate('driver', 'name')
-    .populate('bookedBy', 'name');
-
-  if (io && ride._id) {
-    io.to(`driver_${ride.driver._id}`).emit('ride_booked', {
-  rideId: ride._id,
-  byUserId: user._id,
-  driverId: ride.driver._id, // ✅ Add this
-  message: `${user.name} booked your ride`,
-});
-
-    io.to(ride._id.toString()).emit('passenger_updated', {
-      rideId: ride._id,
-      passengers: populated.bookedBy,
-    });
-  }
-
-  return populated;
 };
 
 // -------------------------
@@ -48,7 +59,7 @@ const bookRide = async (ride, user, io) => {
 // -------------------------
 router.post('/', auth, async (req, res) => {
   try {
-     console.log('👉 Authenticated user:', req.user);
+    console.log('👉 Authenticated user:', req.user);
     const userId = req.user.id;
     const { from, to, date, driverArrivingIn, seatsAvailable, costPerPerson, cabScreenshotUrl } = req.body;
 
@@ -65,15 +76,26 @@ router.post('/', auth, async (req, res) => {
       initialSeats: parseInt(seatsAvailable),
       costPerPerson,
       cabScreenshotUrl,
-      driver: userId, // ✅ key line: set driver from auth token
-    });
+      driver: userId,
+    });    const savedRide = await ride.save();
+    const populatedRide = await Ride.findById(savedRide._id)
+      .populate('driver', 'name')
+      .populate('bookedBy', 'name');    // Emit ride update event with driverId ONLY to the specific driver's room
+    const io = req.app.get('io');
+    if (io) {
+      // Use the specific driver's room for the emission
+      io.to(`driver_${userId}`).emit('ride_update', {
+        driverId: userId,
+        action: 'create',
+        ride: populatedRide
+      });
+      console.log('✅ Emitted ride_update to driver:', userId);
+    }
 
-    await ride.save();
-    const populatedRide = await ride.populate('driver', 'name');
     res.status(201).json(populatedRide);
   } catch (err) {
-    console.error('❌ Failed to create ride:', err); // 👈 log full error
-    res.status(500).json({ msg: 'Failed to create ride.', error: err.message }); // 👈 send message to client
+    console.error('❌ Failed to create ride:', err);
+    res.status(500).json({ msg: 'Failed to create ride.', error: err.message });
   }
 });
 
@@ -82,9 +104,8 @@ router.post('/', auth, async (req, res) => {
 // -------------------------
 router.get('/mine', auth, async (req, res) => {
   try {
-    console.log("✅ /mine requested by user:", req.user);
-
-    const rides = await Ride.find({ driver: req.user._id })
+    console.log("✅ /mine requested by user:", req.user);    const rides = await Ride.find({ driver: req.user._id })
+      .populate('driver', 'name email')  // Add driver population
       .populate('bookedBy', 'name email')
       .sort({ createdAt: -1 });
 
@@ -125,13 +146,26 @@ router.get('/', async (req, res) => {
 // -------------------------
 // GET /api/rides/:id - Ride detail
 // -------------------------
-router.get('/:id', async (req, res) => {
-  try {
+router.get('/:id', async (req, res) => {  try {
     const ride = await Ride.findById(req.params.id)
       .populate('driver', 'name')
       .populate('bookedBy', 'name');
 
     if (!ride) return res.status(404).json({ error: 'Ride not found' });
+
+    // Check if ride has expired
+    const createdAt = new Date(ride.createdAt).getTime();
+    const now = Date.now();
+    const elapsed = Math.floor((now - createdAt) / 1000);
+    const timeoutSeconds = ride.driverArrivingIn * 60;
+
+    if (elapsed > timeoutSeconds) {
+      // Ride has expired
+      return res.status(404).json({ 
+        error: 'Ride has ended',
+        expired: true
+      });
+    }
 
     res.json(ride);
   } catch (err) {

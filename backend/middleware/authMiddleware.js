@@ -14,6 +14,12 @@ const auth = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Check if token is expired
+    const now = Date.now().valueOf() / 1000;
+    if (typeof decoded.exp !== 'undefined' && decoded.exp < now) {
+      return res.status(401).json({ msg: 'Token has expired' });
+    }
 
     const user = await User.findById(decoded.id).select('-password');
     if (!user) return res.status(401).json({ msg: 'User not found' });

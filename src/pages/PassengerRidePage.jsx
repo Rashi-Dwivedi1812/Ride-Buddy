@@ -15,7 +15,21 @@ const PassengerRidePage = () => {
 
   // Fetch ride, user, messages, and set up socket
   useEffect(() => {
-    let socket;
+    const socket = io('http://localhost:5000', {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 90000,
+      autoConnect: true,
+      forceNew: true,
+      auth: {
+        token: localStorage.getItem('token')
+      }
+    });
+
+    socketRef.current = socket;
 
     const fetchRideAndUser = async () => {
       try {
@@ -33,42 +47,36 @@ const PassengerRidePage = () => {
         const msgRes = await axios.get(`http://localhost:5000/api/messages/${rideId}`, { headers });
         setMessages(msgRes.data);
 
-        // Connect socketMore actions
-        socket = io('http://localhost:5000', {
-          transports: ['websocket'],
-          reconnection: true,
-          reconnectionAttempts: 10,
-          withCredentials: true,
-        });
+        // Join the room after fetching data
         socket.emit('join_room', rideId);
-        socketRef.current = socket;
-
-        const handleMessage = (msg) => {
-          if (msg.rideId === rideId) {
-            setMessages((prev) => [...prev, msg]);
-          }
-        };
-
-        socket.on('chat_message', handleMessage);
-        return () => {
-          socket.off('chat_message', handleMessage); // ✅ remove this specific handler
-          socket.disconnect();
-        };
-
       } catch (err) {
         console.error('Error loading data:', err);
         if (err.response && err.response.status === 404) {
-           setRide('not_found');
+          if (err.response.data?.expired) {
+            setRide('expired');
+          } else {
+            setRide('not_found');
+          }
         }
       }
     };
-    const cleanupPromise = fetchRideAndUser();
 
-    // cleanup runs on rideId change or unmount
+    fetchRideAndUser();
+
+    // Set up chat message handler
+    const handleMessage = (msg) => {
+      if (msg.rideId === rideId) {
+        setMessages(prev => [...prev, msg]);
+      }
+    };
+
+    socket.on('chat_message', handleMessage);
+
+    // Cleanup function
     return () => {
-      cleanupPromise.then((cleanup) => {
-        if (typeof cleanup === 'function') cleanup(); // call the inner cleanup
-      });
+      socket.off('chat_message', handleMessage);
+      socket.disconnect();
+      socketRef.current = null;
     };
   }, [rideId]);
 
@@ -113,11 +121,18 @@ const PassengerRidePage = () => {
     const secs = seconds % 60;
     return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
-
- if (ride === 'not_found') {
+ if (ride === 'not_found' || ride === 'expired') {
   return (
-    <div className="text-center text-red-500 mt-10">
-      Ride not found or has ended. Please return to home.
+    <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center justify-center px-4">
+      <div className="text-center text-red-400 mb-4">
+        {ride === 'expired' ? 'This ride has ended.' : 'Ride not found.'}
+      </div>
+      <a 
+        href="/find" 
+        className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-xl text-white transition-all"
+      >
+        ← Back to Available Rides
+      </a>
     </div>
   );
 }

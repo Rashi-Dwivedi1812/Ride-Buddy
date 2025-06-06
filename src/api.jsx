@@ -7,6 +7,20 @@ const instance = axios.create({
   },
 });
 
+// Add response interceptor to handle 401 errors
+instance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && (error.response.status === 401 || error.response.data?.msg === 'Token has expired')) {
+      // Clear invalid token
+      localStorage.removeItem('token');
+      // Redirect to login
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 instance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
