@@ -15,6 +15,7 @@ const PassengerRidePage = () => {
   const socketRef = useRef(null);
   const userRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const shownMessagesRef = useRef(new Set());
 
   // Load cached data on mount
   useEffect(() => {
@@ -48,17 +49,31 @@ const PassengerRidePage = () => {
       auth: { token: localStorage.getItem('token') }
     });
 
-    socketRef.current = socket;
+    socketRef.current = socket;    
+    
+    
 
-    const handleMessage = (msg) => {
-      if (msg.rideId === rideId) {
-        setMessages(prev => {
-          const newMessages = [...prev, msg];
-          localStorage.setItem(`messages_${rideId}`, JSON.stringify(newMessages));
-          return newMessages;
+const handleMessage = (msg) => {
+  if (msg.rideId === rideId) {
+    setMessages(prev => {
+      const newMessages = [...prev, msg];
+      localStorage.setItem(`messages_${rideId}`, JSON.stringify(newMessages));
+
+      // Only show toast if it's from another user AND hasn't been shown before
+      const uniqueId = `${msg.senderId}_${msg.text}_${msg.createdAt || ''}`;
+      if (msg.senderId !== userRef.current?._id && !shownMessagesRef.current.has(uniqueId)) {
+        shownMessagesRef.current.add(uniqueId);
+        toast.info(`💬 ${msg.senderName}: ${msg.text.slice(0, 50)}${msg.text.length > 50 ? '...' : ''}`, {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
         });
       }
-    };
+
+      return newMessages;
+    });
+  }
+};
 
     const handleRideUpdate = (updatedRide) => {
       if (updatedRide._id === rideId) {

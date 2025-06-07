@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const CurrentRidePage = () => {
   const { rideId } = useParams();
@@ -16,6 +17,8 @@ const CurrentRidePage = () => {
   const [isRideOwner, setIsRideOwner] = useState(false);
   const socketRef = useRef(null);
   const selectedPassengerRef = useRef(null); // <-- track latest passenger
+  const currentUserRef = useRef(null);
+    const shownMessagesRef = useRef(new Set());
 
   // Load cached data on mount
   useEffect(() => {
@@ -150,16 +153,37 @@ const CurrentRidePage = () => {
       }, 1000);
     });
 
-    // Handle chat messages
-    socket.on('chat_message', (msg) => {
-      const currentPassenger = selectedPassengerRef.current;
-      if (
-        (msg.senderId === user?._id || msg.receiverId === user?._id) &&
-        (msg.senderId === currentPassenger?._id || msg.receiverId === currentPassenger?._id)
-      ) {
-        setChatMessages((prev) => [...prev, msg]);
-      }
+   socket.on('chat_message', (msg) => {
+  const currentUserId = currentUserRef.current?._id?.toString();
+  const senderId = msg?.senderId?.toString();
+  const receiverId = msg?.receiverId?.toString();
+  const currentPassenger = selectedPassengerRef.current;
+  const passengerId = currentPassenger?._id?.toString();
+
+  const isRelevantChat =
+    (senderId === currentUserId || receiverId === currentUserId) &&
+    (senderId === passengerId || receiverId === passengerId);
+
+  const isMessageFromOtherUser = senderId !== currentUserId;
+
+  if (isRelevantChat) {
+    setChatMessages((prev) => [...prev, msg]);
+  }
+
+  // 🛡️ Prevent duplicate toasts
+  const uniqueId = `${msg.senderId}_${msg.text}_${msg.createdAt || ''}`;
+  const alreadyShown = shownMessagesRef.current?.has(uniqueId);
+
+  if (isRelevantChat && isMessageFromOtherUser && !alreadyShown) {
+    shownMessagesRef.current?.add(uniqueId);
+
+    toast.info(`💬 ${msg.senderName}: ${msg.text.slice(0, 50)}${msg.text.length > 50 ? '...' : ''}`, {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: false,
     });
+  }
+});
 
     socket.on('passenger_updated', fetchRide);
 
@@ -177,6 +201,10 @@ const CurrentRidePage = () => {
       socket.disconnect();
     };
   }, [rideId]);
+
+  useEffect(() => {
+  currentUserRef.current = currentUser;
+}, [currentUser]);
 
   useEffect(() => {
     selectedPassengerRef.current = selectedPassenger;
