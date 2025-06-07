@@ -1,19 +1,40 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
+import { toast } from 'react-toastify';
 
 const PassengerRidePage = () => {
   const { rideId } = useParams();
   const [ride, setRide] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [arrivalTimeLeft, setArrivalTimeLeft] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
   const socketRef = useRef(null);
   const userRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
-  // Fetch ride, user, messages, and set up socket
+  // Load cached data on mount
+  useEffect(() => {
+    const cachedRide = localStorage.getItem(`ride_${rideId}`);
+    const cachedMessages = localStorage.getItem(`messages_${rideId}`);
+    if (cachedRide) {
+      setRide(JSON.parse(cachedRide));
+      setLoading(false);
+    }
+    if (cachedMessages) {
+      setMessages(JSON.parse(cachedMessages));
+    }
+  }, [rideId]);
+
+  // Scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Socket setup
   useEffect(() => {
     const socket = io('http://localhost:5000', {
       transports: ['websocket', 'polling'],
@@ -24,59 +45,76 @@ const PassengerRidePage = () => {
       timeout: 90000,
       autoConnect: true,
       forceNew: true,
-      auth: {
-        token: localStorage.getItem('token')
-      }
+      auth: { token: localStorage.getItem('token') }
     });
 
     socketRef.current = socket;
+
+    const handleMessage = (msg) => {
+      if (msg.rideId === rideId) {
+        setMessages(prev => {
+          const newMessages = [...prev, msg];
+          localStorage.setItem(`messages_${rideId}`, JSON.stringify(newMessages));
+          return newMessages;
+        });
+      }
+    };
+
+    const handleRideUpdate = (updatedRide) => {
+      if (updatedRide._id === rideId) {
+        setRide(updatedRide);
+        localStorage.setItem(`ride_${rideId}`, JSON.stringify(updatedRide));
+      }
+    };
+
+    socket.on('connect', () => {
+      console.log('Socket connected');
+      fetchRideAndUser();
+    });
+
+    socket.on('chat_message', handleMessage);
+    socket.on('ride_update', handleRideUpdate);
+    socket.on('disconnect', () => toast.warn('Connection lost. Trying to reconnect...'));
+    socket.on('connect_error', () => toast.error('Connection error. Retrying...'));
 
     const fetchRideAndUser = async () => {
       try {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
 
-        // Fetch ride
-        const rideRes = await axios.get(`http://localhost:5000/api/rides/${rideId}`, { headers });
+        const [rideRes, userRes, msgRes] = await Promise.all([
+          axios.get(`http://localhost:5000/api/rides/${rideId}`, { headers }),
+          axios.get(`http://localhost:5000/api/auth/me`, { headers }),
+          axios.get(`http://localhost:5000/api/messages/${rideId}`, { headers })
+        ]);
+
         setRide(rideRes.data);
-
-        // Fetch current user
-        const userRes = await axios.get(`http://localhost:5000/api/auth/me`, { headers });
         userRef.current = userRes.data;
-
-        const msgRes = await axios.get(`http://localhost:5000/api/messages/${rideId}`, { headers });
         setMessages(msgRes.data);
 
-        // Join the room after fetching data
+        localStorage.setItem(`ride_${rideId}`, JSON.stringify(rideRes.data));
+        localStorage.setItem('currentUser', JSON.stringify(userRes.data));
+        localStorage.setItem(`messages_${rideId}`, JSON.stringify(msgRes.data));
+
         socket.emit('join_room', rideId);
+        setLoading(false);
       } catch (err) {
-        console.error('Error loading data:', err);
-        if (err.response && err.response.status === 404) {
-          if (err.response.data?.expired) {
-            setRide('expired');
-          } else {
-            setRide('not_found');
-          }
-        }
+        console.error('Error fetching data:', err);
+        toast.error('Failed to load ride data. Retrying...');
       }
     };
 
+    // Initial fetch
     fetchRideAndUser();
 
-    // Set up chat message handler
-    const handleMessage = (msg) => {
-      if (msg.rideId === rideId) {
-        setMessages(prev => [...prev, msg]);
-      }
-    };
-
-    socket.on('chat_message', handleMessage);
-
-    // Cleanup function
+    // Cleanup
     return () => {
-      socket.off('chat_message', handleMessage);
+      socket.off('connect');
+      socket.off('chat_message');
+      socket.off('ride_update');
+      socket.off('disconnect');
+      socket.off('connect_error');
       socket.disconnect();
-      socketRef.current = null;
     };
   }, [rideId]);
 
@@ -111,7 +149,7 @@ const PassengerRidePage = () => {
       room: rideId,
     };
 
-    socketRef.current.emit('chat_message', messageData);
+    socketRef.current?.emit('chat_message', messageData);
     setNewMessage('');
   };
 
@@ -121,30 +159,45 @@ const PassengerRidePage = () => {
     const secs = seconds % 60;
     return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
- if (ride === 'not_found' || ride === 'expired') {
-  return (
-    <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center justify-center px-4">
-      <div className="text-center text-red-400 mb-4">
-        {ride === 'expired' ? 'This ride has ended.' : 'Ride not found.'}
-      </div>
-      <a 
-        href="/find" 
-        className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-xl text-white transition-all"
-      >
-        ← Back to Available Rides
-      </a>
-    </div>
-  );
-}
 
-if (!ride) {
-  return <div className="text-center mt-10 text-white">Loading ride details...</div>;
-}
+  // Render loading and error states
+  if (loading) {
+    return (
+      <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+        <p className="text-gray-400">Loading ride details...</p>
+      </div>
+    );
+  }
+
+  if (ride === 'not_found' || ride === 'expired') {
+    return (
+      <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center justify-center px-4">
+        <div className="text-center text-red-400 mb-4">
+          {ride === 'expired' ? 'This ride has ended.' : 'Ride not found.'}
+        </div>
+        <Link 
+          to="/find" 
+          className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-xl text-white transition-all"
+        >
+          ← Back to Available Rides
+        </Link>
+      </div>
+    );
+  }
+
+  if (!ride) {
+    return (
+      <div className="text-center mt-10 text-white">No ride found</div>
+    );
+  }
   return (
     <div className="dark min-h-screen bg-[#0f0f0f] text-white flex flex-col items-center px-4 py-10 relative overflow-hidden">
+      {/* Background effects */}
       <div className="absolute inset-0 bg-[radial-gradient(#ffffff0d_1px,transparent_1px)] [background-size:20px_20px] z-0" />
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-700 opacity-10 blur-2xl z-0" />
 
+      {/* Title */}
       <h2 className="z-10 text-4xl font-extrabold mb-8 text-white drop-shadow text-center">
         🚖 Ride in Progress
       </h2>
@@ -211,19 +264,21 @@ if (!ride) {
               >
                 ✕
               </button>
-            </div>
-            <div className="h-40 overflow-y-auto bg-black/30 text-white text-sm p-2 rounded mb-3">
+            </div>            <div className="h-40 overflow-y-auto bg-black/30 text-white text-sm p-2 rounded mb-3">
               {messages.length === 0 ? (
                 <p className="text-gray-400 italic">No messages yet.</p>
               ) : (
-                messages.map((msg, idx) => (
-                  <p
-                    key={idx}
-                    className={`${msg.senderId === userRef.current?._id ? 'text-right' : 'text-left'}`}>
-                    <span className="text-green-300 font-semibold">{msg.senderName}:</span> {msg.text}
-                  </p>
-                ))
-              )}
+                <>
+                  {messages.map((msg, idx) => (
+                    <p
+                      key={idx}
+                      className={`${msg.senderId === userRef.current?._id ? 'text-right' : 'text-left'} mb-1`}
+                    >
+                      <span className="text-green-300 font-semibold">{msg.senderName}:</span> {msg.text}
+                    </p>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>              )}
             </div>
             <div className="flex gap-2">
               <input

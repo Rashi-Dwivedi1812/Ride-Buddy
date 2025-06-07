@@ -124,6 +124,10 @@ router.get('/', async (req, res) => {
     const { sortBy, seats } = req.query;
     const query = {};
 
+    // Add time-based filtering (show rides that are less than 10 minutes old)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    query.createdAt = { $gte: tenMinutesAgo };
+
     if (seats && !isNaN(parseInt(seats))) {
       query.seatsAvailable = { $gte: parseInt(seats) };
     }
@@ -146,25 +150,39 @@ router.get('/', async (req, res) => {
 // -------------------------
 // GET /api/rides/:id - Ride detail
 // -------------------------
-router.get('/:id', async (req, res) => {  try {
-    const ride = await Ride.findById(req.params.id)
+router.get('/:id', async (req, res) => {  try {    const ride = await Ride.findById(req.params.id)
       .populate('driver', 'name')
       .populate('bookedBy', 'name');
 
     if (!ride) return res.status(404).json({ error: 'Ride not found' });
 
-    // Check if ride has expired
-    const createdAt = new Date(ride.createdAt).getTime();
-    const now = Date.now();
-    const elapsed = Math.floor((now - createdAt) / 1000);
-    const timeoutSeconds = ride.driverArrivingIn * 60;
+    // Check if ride has expired (only if it hasn't been booked)
+    if (ride.bookedBy.length === 0) {
+      const createdAt = new Date(ride.createdAt).getTime();
+      const now = Date.now();
+      const elapsed = Math.floor((now - createdAt) / 1000);
+      const timeoutSeconds = ride.driverArrivingIn * 60;
 
-    if (elapsed > timeoutSeconds) {
-      // Ride has expired
-      return res.status(404).json({ 
-        error: 'Ride has ended',
-        expired: true
-      });
+      if (elapsed > timeoutSeconds) {
+        // Ride has expired
+        return res.status(404).json({ 
+          error: 'Ride has ended',
+          expired: true
+        });
+      }
+    } else {
+      // For booked rides, extend the expiration to 2 hours from creation
+      const createdAt = new Date(ride.createdAt).getTime();
+      const now = Date.now();
+      const elapsed = Math.floor((now - createdAt) / 1000);
+      const twoHoursInSeconds = 2 * 60 * 60; // 2 hours
+
+      if (elapsed > twoHoursInSeconds) {
+        return res.status(404).json({ 
+          error: 'Ride has ended',
+          expired: true
+        });
+      }
     }
 
     res.json(ride);

@@ -52,13 +52,22 @@ const startServer = async () => {
         origin: allowedOrigins,
         credentials: true,
       },
-      pingTimeout: 60000, // 1 minute ping timeout
-      pingInterval: 25000, // 25 second ping interval
+      pingTimeout: 120000, // 2 minute ping timeout
+      pingInterval: 30000, // 30 second ping interval
       connectionStateRecovery: {
         maxDisconnectionDuration: 2 * 60 * 60 * 1000, // 2 hours max disconnection
         skipMiddlewares: true,
       },
-      transports: ['websocket', 'polling'] // prefer websocket
+      transports: ['websocket', 'polling'], // prefer websocket
+      allowEIO3: true, // Enable compatibility mode
+      maxHttpBufferSize: 1e8, // Increase buffer size
+      cookie: {
+        name: 'io',
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 2 * 60 * 60 * 1000 // 2 hours
+      }
     });
 
     // Make io accessible from req.app.get('io') inside controllers

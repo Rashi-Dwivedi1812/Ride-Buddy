@@ -2,10 +2,12 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
+import { toast } from 'react-toastify';
 
 const CurrentRidePage = () => {
   const { rideId } = useParams();
   const [ride, setRide] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [arrivalTimeLeft, setArrivalTimeLeft] = useState(null);
   const [selectedPassenger, setSelectedPassenger] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
@@ -14,6 +16,27 @@ const CurrentRidePage = () => {
   const [isRideOwner, setIsRideOwner] = useState(false);
   const socketRef = useRef(null);
   const selectedPassengerRef = useRef(null); // <-- track latest passenger
+
+  // Load cached data on mount
+  useEffect(() => {
+    const cachedRide = localStorage.getItem(`ride_${rideId}`);
+    const cachedMessages = localStorage.getItem(`messages_${rideId}`);
+    const cachedUser = localStorage.getItem('currentUser');
+    
+    if (cachedRide) {
+      const parsedRide = JSON.parse(cachedRide);
+      setRide(parsedRide);
+      if (cachedUser) {
+        const parsedUser = JSON.parse(cachedUser);
+        setCurrentUser(parsedUser);
+        setIsRideOwner(parsedRide.creator?._id === parsedUser._id);
+      }
+      setLoading(false);
+    }
+    if (cachedMessages) {
+      setChatMessages(JSON.parse(cachedMessages));
+    }
+  }, [rideId]);
 
   const parseToken = () => {
     try {
@@ -27,12 +50,15 @@ const CurrentRidePage = () => {
   };
 
   const fetchRide = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const res = await axios.get(`http://localhost:5000/api/rides/${rideId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setRide(res.data);
+      localStorage.setItem(`ride_${rideId}`, JSON.stringify(res.data));
+      
       if (res.data.creator?._id === currentUser?._id) {
         setIsRideOwner(true);
       }
@@ -45,9 +71,12 @@ const CurrentRidePage = () => {
       }
     } catch (err) {
       console.error('Failed to fetch ride:', err);
+      toast.error('Failed to load ride data. Retrying...');
       if (err.response && err.response.status === 404) {
         setRide(null); // mark ride as not found
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -67,6 +96,7 @@ const CurrentRidePage = () => {
         }
       );
       setChatMessages(res.data);
+      localStorage.setItem(`messages_${rideId}`, JSON.stringify(res.data));
     } catch (err) {
       console.error('Failed to fetch messages:', err);
     }
@@ -82,7 +112,7 @@ const CurrentRidePage = () => {
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 90000, // 1.5 minutes timeout
+      timeout: 120000, // 2 minute timeout
       autoConnect: true,
       forceNew: true,
       auth: {
@@ -92,8 +122,35 @@ const CurrentRidePage = () => {
 
     socketRef.current = socket;
 
-    socket.emit('join_room', rideId);
+    // Handle connection events
+    socket.on('connect', () => {
+      console.log('Socket connected');
+      socket.emit('join_room', rideId);
+      fetchRide(); // Refresh data on reconnect
+    });
 
+    socket.on('reconnect', (attempt) => {
+      console.log('Socket reconnected after', attempt, 'attempts');
+      socket.emit('join_room', rideId);
+      fetchRide(); // Refresh data on reconnect
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      if (reason === 'io server disconnect') {
+        // Automatically try to reconnect if server disconnected
+        socket.connect();
+      }
+    });
+
+    socket.on('connect_error', (error) => {
+      console.log('Connection error:', error);
+      setTimeout(() => {
+        socket.connect();
+      }, 1000);
+    });
+
+    // Handle chat messages
     socket.on('chat_message', (msg) => {
       const currentPassenger = selectedPassengerRef.current;
       if (
@@ -106,9 +163,17 @@ const CurrentRidePage = () => {
 
     socket.on('passenger_updated', fetchRide);
 
+    // Initial fetch
     fetchRide();
 
+    // Cleanup
     return () => {
+      socket.off('connect');
+      socket.off('reconnect');
+      socket.off('disconnect');
+      socket.off('connect_error');
+      socket.off('chat_message');
+      socket.off('passenger_updated');
       socket.disconnect();
     };
   }, [rideId]);
