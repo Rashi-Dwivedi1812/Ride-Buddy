@@ -16,6 +16,8 @@ const PassengerRidePage = () => {
   const userRef = useRef(null);
   const messagesEndRef = useRef(null);
   const shownMessagesRef = useRef(new Set());
+  const notificationSoundRef = useRef(null);
+
 
   // Load cached data on mount
   useEffect(() => {
@@ -59,10 +61,18 @@ const handleMessage = (msg) => {
       const newMessages = [...prev, msg];
       localStorage.setItem(`messages_${rideId}`, JSON.stringify(newMessages));
 
+      
+
       // Only show toast if it's from another user AND hasn't been shown before
       const uniqueId = `${msg.senderId}_${msg.text}_${msg.createdAt || ''}`;
       if (msg.senderId !== userRef.current?._id && !shownMessagesRef.current.has(uniqueId)) {
         shownMessagesRef.current.add(uniqueId);
+
+        // 🔊 Play sound
+  notificationSoundRef.current?.play().catch(err => {
+    console.warn('Notification sound failed:', err);
+  });
+  
         toast.info(`💬 ${msg.senderName}: ${msg.text.slice(0, 50)}${msg.text.length > 50 ? '...' : ''}`, {
           position: "top-right",
           autoClose: 3000,
@@ -313,6 +323,7 @@ const handleMessage = (msg) => {
             </div>
           </div>
         )}
+        <audio ref={notificationSoundRef} src="/preview.mp3" preload="auto" />
       </div>
     </div>
   );

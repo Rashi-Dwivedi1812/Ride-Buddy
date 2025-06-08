@@ -18,7 +18,9 @@ const CurrentRidePage = () => {
   const socketRef = useRef(null);
   const selectedPassengerRef = useRef(null); // <-- track latest passenger
   const currentUserRef = useRef(null);
-    const shownMessagesRef = useRef(new Set());
+  const shownMessagesRef = useRef(new Set());
+  const notificationSoundRef = useRef(null);
+
 
   // Load cached data on mount
   useEffect(() => {
@@ -177,6 +179,14 @@ const CurrentRidePage = () => {
   if (isRelevantChat && isMessageFromOtherUser && !alreadyShown) {
     shownMessagesRef.current?.add(uniqueId);
 
+     // 🔊 Play sound
+  if (notificationSoundRef.current) {
+    console.log("🔔 Incoming message from", msg.senderName);
+    notificationSoundRef.current.play().catch((err) => {
+      console.warn('Unable to play sound:', err);
+    });
+  }
+
     toast.info(`💬 ${msg.senderName}: ${msg.text.slice(0, 50)}${msg.text.length > 50 ? '...' : ''}`, {
       position: "top-right",
       autoClose: 3000,
@@ -322,7 +332,10 @@ const chatTargets = isRideOwner
             </p>
           )}
         </div>
-
+   {/* 🟣 Add this below the chat header */}
+    <p className="text-sm text-gray-400 italic mb-2">
+      Keep refreshing to see new messages ⟳
+    </p>
         {/* Chat Box */}
         {selectedPassenger && (
           <div className="fixed bottom-4 right-4 w-96 bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-purple-500 z-50 shadow-xl">
@@ -375,6 +388,7 @@ const chatTargets = isRideOwner
             </div>
           </div>
         )}
+        <audio ref={notificationSoundRef} src="/preview.mp3" preload="auto" />
       </div>
     </div>
   );
