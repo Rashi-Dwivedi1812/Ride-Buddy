@@ -12,7 +12,7 @@ import authRoutes from './routes/authRoutes.js';
 import rideRoutes from './routes/rideRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
-
+import feedbackRoutes from './routes/feedbackRoutes.js';
 import Message from './models/Message.js';
 
 const requiredEnv = ['MONGO_URI', 'JWT_SECRET'];
@@ -76,6 +76,7 @@ const startServer = async () => {
     // REST API routes
     app.use('/api/auth', authRoutes);
     app.use('/api/rides', rideRoutes);
+    app.use('/api/feedback', feedbackRoutes);
     app.use('/api/messages', chatRoutes);    // Socket.io connection
     io.on('connection', (socket) => {
       console.log(`⚡ New client connected: ${socket.id}`);

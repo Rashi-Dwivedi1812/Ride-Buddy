@@ -12,6 +12,7 @@ import { ToastContainer } from 'react-toastify';
 import CurrentRidePage from './pages/currentRidePage';
 import 'react-toastify/dist/ReactToastify.css';
 import PassengerRidePage from './pages/PassengerRidePage';
+import FeedbackPage from './pages/FeedbackPage';
 
 
 const App = () => {
@@ -31,7 +32,7 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/current-ride/:rideId" element={<CurrentRidePage />} />
           <Route path="/passenger-ride/:rideId" element={<PassengerRidePage />} />
-
+          <Route path='/feedback' element={<FeedbackPage/>}/>
         </Routes>
         <ToastContainer position="top-center" autoClose={3000} />
       </>
