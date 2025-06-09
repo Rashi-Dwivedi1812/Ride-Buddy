@@ -77,10 +77,14 @@ router.post('/', auth, async (req, res) => {
       costPerPerson,
       cabScreenshotUrl,
       driver: userId,
-    });    const savedRide = await ride.save();
+    });
+    
+    const savedRide = await ride.save();
     const populatedRide = await Ride.findById(savedRide._id)
       .populate('driver', 'name')
-      .populate('bookedBy', 'name');    // Emit ride update event with driverId ONLY to the specific driver's room
+      .populate('bookedBy', 'name');
+
+    // Emit ride update event with driverId ONLY to the specific driver's room
     const io = req.app.get('io');
     if (io) {
       // Use the specific driver's room for the emission
@@ -104,7 +108,9 @@ router.post('/', auth, async (req, res) => {
 // -------------------------
 router.get('/mine', auth, async (req, res) => {
   try {
-    console.log("✅ /mine requested by user:", req.user);    const rides = await Ride.find({ driver: req.user._id })
+    console.log("✅ /mine requested by user:", req.user);
+    
+    const rides = await Ride.find({ driver: req.user._id })
       .populate('driver', 'name email')  // Add driver population
       .populate('bookedBy', 'name email')
       .sort({ createdAt: -1 });
@@ -148,9 +154,54 @@ router.get('/', async (req, res) => {
 });
 
 // -------------------------
+// GET /api/rides/booked - Rides the user booked (as passenger)
+// -------------------------
+router.get('/booked', auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const bookedRides = await Ride.find({ bookedBy: { $in: [userId] } })
+      .populate('driver', 'name email') // ✅ Populate driver info (needed for passenger view)
+      .populate('bookedBy', 'name email')
+      .sort({ date: -1 });
+
+    res.json(bookedRides);
+  } catch (error) {
+    console.error('Error fetching booked rides:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// -------------------------
+// GET /api/rides/posted - Rides the user posted (as driver)
+// -------------------------
+router.get('/posted', auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const postedRides = await Ride.find({ driver: userId })
+      .populate('bookedBy', 'name email') // ✅ Don't populate driver (user is the driver)
+      .sort({ date: -1 });
+
+    // Add a flag to indicate these are posted rides
+    const ridesWithFlag = postedRides.map(ride => ({
+      ...ride.toObject(),
+      isPostedByUser: true // ✅ Add flag to identify posted rides
+    }));
+
+    res.json(ridesWithFlag);
+  } catch (error) {
+    console.error('Error fetching posted rides:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// -------------------------
 // GET /api/rides/:id - Ride detail
 // -------------------------
-router.get('/:id', async (req, res) => {  try {    const ride = await Ride.findById(req.params.id)
+router.get('/:id', async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.id)
       .populate('driver', 'name')
       .populate('bookedBy', 'name');
 
