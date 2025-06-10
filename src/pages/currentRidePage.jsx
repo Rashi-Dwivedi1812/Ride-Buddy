@@ -334,7 +334,7 @@ const chatTargets = isRideOwner
         </div>
    {/* 🟣 Add this below the chat header */}
     <p className="text-sm text-gray-400 italic mb-2">
-      Keep refreshing to see new messages ⟳
+      To see new msgs, open chatbox and keep refreshing '⟳ '
     </p>
         {/* Chat Box */}
         {selectedPassenger && (

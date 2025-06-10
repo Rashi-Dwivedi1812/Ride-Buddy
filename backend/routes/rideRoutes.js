@@ -156,16 +156,30 @@ router.get('/', async (req, res) => {
 // -------------------------
 // GET /api/rides/booked - Rides the user booked (as passenger)
 // -------------------------
+// -------------------------
+// GET /api/rides/booked - Current active booked rides
+// -------------------------
 router.get('/booked', auth, async (req, res) => {
   try {
     const userId = req.user._id;
+    const currentDate = new Date();
 
-    const bookedRides = await Ride.find({ bookedBy: { $in: [userId] } })
-      .populate('driver', 'name email') // ✅ Populate driver info (needed for passenger view)
+    // Only get active/upcoming rides (not completed ones)
+    const bookedRides = await Ride.find({ 
+      bookedBy: { $in: [userId] },
+      date: { $gte: currentDate.toISOString().split('T')[0] }, // Today or future dates
+      status: { $ne: 'completed' } // Exclude completed rides
+    })
+      .populate('driver', 'name')
       .populate('bookedBy', 'name email')
       .sort({ date: -1 });
 
-    res.json(bookedRides);
+     const ridesWithType = bookedRides.map(ride => ({
+      ...ride.toObject(),
+      rideType: 'booked'
+    }));
+
+    res.json(ridesWithType);
   } catch (error) {
     console.error('Error fetching booked rides:', error);
     res.status(500).json({ message: 'Server error' });
@@ -173,25 +187,76 @@ router.get('/booked', auth, async (req, res) => {
 });
 
 // -------------------------
-// GET /api/rides/posted - Rides the user posted (as driver)
+// GET /api/rides/posted - Current active posted rides
 // -------------------------
 router.get('/posted', auth, async (req, res) => {
   try {
     const userId = req.user._id;
+    const currentDate = new Date();
 
-    const postedRides = await Ride.find({ driver: userId })
-      .populate('bookedBy', 'name email') // ✅ Don't populate driver (user is the driver)
+    // Only get active/upcoming rides (not completed ones)
+    const postedRides = await Ride.find({ 
+      driver: userId,
+      date: { $gte: currentDate.toISOString().split('T')[0] }, // Today or future dates
+      status: { $ne: 'completed' } // Exclude completed rides
+    })
+      .populate('bookedBy', 'name email')
       .sort({ date: -1 });
 
-    // Add a flag to indicate these are posted rides
-    const ridesWithFlag = postedRides.map(ride => ({
+     const ridesWithType = postedRides.map(ride => ({
       ...ride.toObject(),
-      isPostedByUser: true // ✅ Add flag to identify posted rides
+      rideType: 'posted'
     }));
 
-    res.json(ridesWithFlag);
+    res.json(ridesWithType);
   } catch (error) {
     console.error('Error fetching posted rides:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// -------------------------
+// GET /api/rides/history - All ride history (booked + posted)
+// -------------------------
+router.get('/history', auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get all rides (past and present) where user was involved
+    const [bookedRides, postedRides] = await Promise.all([
+      // Rides user booked (as passenger)
+      Ride.find({ bookedBy: { $in: [userId] } })
+        .populate('driver', 'name')
+        .populate('bookedBy', 'name email')
+        .sort({ date: -1 }),
+      
+      // Rides user posted (as driver)
+      Ride.find({ driver: userId })
+        .populate('bookedBy', 'name email')
+        .sort({ date: -1 })
+    ]);
+
+    // Mark booked rides
+    const bookedHistory = bookedRides.map(ride => ({
+      ...ride.toObject(),
+      isBooked: true,
+      isPostedByUser: false
+    }));
+
+    // Mark posted rides
+    const postedHistory = postedRides.map(ride => ({
+      ...ride.toObject(),
+      isBooked: false,
+      isPostedByUser: true
+    }));
+
+    // Combine and sort all rides by date (newest first)
+    const allHistory = [...bookedHistory, ...postedHistory]
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json(allHistory);
+  } catch (error) {
+    console.error('Error fetching ride history:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

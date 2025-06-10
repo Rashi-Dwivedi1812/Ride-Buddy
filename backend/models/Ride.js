@@ -73,7 +73,19 @@ const RideSchema = new mongoose.Schema(
         ref: 'User',
           default: []
       }
-    ]
+    ], // New fields for history tracking
+  status: {
+    type: String,
+    enum: ['active', 'completed', 'cancelled'],
+    default: 'active'
+  },
+  completedAt: {
+    type: Date
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
   },
   { timestamps: true }
 );

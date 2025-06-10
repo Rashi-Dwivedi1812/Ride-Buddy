@@ -8,6 +8,8 @@ import {
   FiLogOut
 } from 'react-icons/fi';
 
+import { BsChatDots } from 'react-icons/bs'; 
+
 const HomePage = () => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -119,6 +121,16 @@ const HomePage = () => {
           </Link>
         </div>
       </div>
+   {/* Chat Support Floating Button */}
+<div className="fixed bottom-6 right-6 z-30">
+  <Link
+    to="/feedback"
+    title="Feedback"
+    className="w-12 h-12 flex items-center justify-center rounded-xl bg-[#2e2e2e] hover:bg-[#3a3a3a] shadow-lg transition-all duration-300"
+  >
+    <BsChatDots className="text-[#00b2ff] w-6 h-6" />
+  </Link>
+</div>
     </div>
   );
 };
