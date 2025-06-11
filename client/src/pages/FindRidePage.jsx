@@ -49,7 +49,7 @@ const FindRidePage = () => {
   const fetchRides = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('http://localhost:5000/api/rides');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/rides`);
       const now = Date.now();
       const availableRides = res.data.filter((ride) => shouldDisplayRide(ride, now));
       setRides(availableRides);
@@ -69,7 +69,7 @@ const FindRidePage = () => {
 
   useEffect(() => {
     fetchRides();
-    socketRef.current = io('http://localhost:5000', {
+    socketRef.current = io(import.meta.env.VITE_API_URL.replace('/api', ''), {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -147,7 +147,7 @@ const FindRidePage = () => {
       console.log('🚗 Accepting ride:', rideId);
 
       const res = await axios.post(
-        `http://localhost:5000/api/rides/${rideId}/accept`,
+        `${import.meta.env.VITE_API_URL}/rides/${rideId}/accept`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -166,7 +166,7 @@ const FindRidePage = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        `http://localhost:5000/api/rides/${rideId}/reject`,
+        `${import.meta.env.VITE_API_URL}/rides/${rideId}/reject`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

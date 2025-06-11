@@ -58,7 +58,7 @@ const CurrentRidePage = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`http://localhost:5000/api/rides/${rideId}`, {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/rides/${rideId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setRide(res.data);
@@ -95,7 +95,7 @@ const CurrentRidePage = () => {
     try {
       const token = localStorage.getItem('token');
       const res = await axios.get(
-        `http://localhost:5000/api/messages/${rideId}?receiverId=${receiverId}`,
+        `${import.meta.env.VITE_API_URL}/messages/${rideId}?receiverId=${receiverId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -111,7 +111,7 @@ const CurrentRidePage = () => {
     const user = parseToken();
     setCurrentUser(user);
 
-    const socket = io('http://localhost:5000', {
+    const socket = io(import.meta.env.VITE_API_URL.replace('/api', ''),{
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,

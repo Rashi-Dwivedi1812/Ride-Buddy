@@ -39,7 +39,7 @@ const PassengerRidePage = () => {
 
   // Socket setup
   useEffect(() => {
-    const socket = io('http://localhost:5000', {
+    const socket = io(import.meta.env.VITE_API_URL.replace('/api', ''), {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -108,9 +108,9 @@ const handleMessage = (msg) => {
         const headers = { Authorization: `Bearer ${token}` };
 
         const [rideRes, userRes, msgRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/rides/${rideId}`, { headers }),
-          axios.get(`http://localhost:5000/api/auth/me`, { headers }),
-          axios.get(`http://localhost:5000/api/messages/${rideId}`, { headers })
+          axios.get(`${import.meta.env.VITE_API_URL}/rides/${rideId}`, { headers }),
+          axios.get(`${import.meta.env.VITE_API_URL}/auth/me`, { headers }),
+          axios.get(`${import.meta.env.VITE_API_URL}/messages/${rideId}`, { headers })
         ]);
 
         setRide(rideRes.data);

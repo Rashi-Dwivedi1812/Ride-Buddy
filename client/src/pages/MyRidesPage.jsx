@@ -31,7 +31,7 @@ const MyRidesPage = () => {
     try {
       const token = localStorage.getItem('token');
       console.log('🔍 Fetching rides for user:', userId);
-      const res = await axios.get('http://localhost:5000/api/rides/mine', {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/rides/mine`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       console.log('📦 Raw response data:', res.data);      // We don't need to filter since the backend already filters by driver
@@ -63,7 +63,7 @@ const MyRidesPage = () => {
     const userId = decoded.id || decoded._id;
     console.log('👤 User ID:', userId);
 
-    socketRef.current = io('http://localhost:5000', {
+    socketRef.current = io(import.meta.env.VITE_API_URL.replace('/api', ''), {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,

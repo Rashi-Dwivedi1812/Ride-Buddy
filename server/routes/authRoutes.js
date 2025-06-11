@@ -63,6 +63,7 @@ function validateAndSanitizeLoginInput({ email, password }) {
 router.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
   const { isValid, sanitized, errors } = validateAndSanitizeRegisterInput({ name, email, password });
+  console.log('📩 Register body:', req.body);
 
   if (!isValid) return res.status(400).json({ msg: 'Invalid input', errors });
 
