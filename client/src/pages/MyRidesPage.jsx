@@ -189,7 +189,7 @@ const MyRidesPage = () => {
       )}
 
       <h2 className="z-10 text-4xl font-extrabold mb-8 text-white drop-shadow text-center">
-        🚗 Recent Rides
+        🚗 My Rides
       </h2>
 
       <div className="z-10 w-full max-w-4xl space-y-6">

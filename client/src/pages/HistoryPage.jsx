@@ -1,84 +1,37 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
+// ✅ RideCard component to display each ride's details
 const RideCard = ({ ride, isBooked }) => {
-  const status = {
-    text: ride.status === 'completed' ? 'Completed' : 'Scheduled',
-    color: ride.status === 'completed' ? 'gray' : 'yellow',
-  };
-
-  const formattedDate = new Date(ride.date).toLocaleDateString();
-
   return (
-    <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-5 mb-4 text-white shadow-lg transition hover:scale-[1.02] hover:shadow-xl duration-300">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex gap-2 flex-wrap">
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              ride.rideType === 'booked'
-                ? 'bg-blue-500/20 text-blue-300'
-                : 'bg-green-500/20 text-green-300'
-            }`}
-          >
-            {ride.rideType === 'booked' ? 'Booked Ride' : 'Posted Ride'}
-          </span>
-
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold bg-${status.color}-500/20 text-${status.color}-300`}
-          >
-            {status.text}
-          </span>
-        </div>
-        <span className="text-sm text-gray-400">{formattedDate}</span>
+    <div className="bg-white/5 rounded-xl p-6 shadow-md">
+      <div className="mb-2 flex justify-between items-center">
+        <h3 className="text-lg font-bold text-white">
+          {ride.source} → {ride.destination}
+        </h3>
+        <span
+          className={`px-3 py-1 text-xs rounded-full font-semibold ${
+            isBooked ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'
+          }`}
+        >
+          {isBooked ? 'Booked' : 'Posted'}
+        </span>
       </div>
-
-      <div className="space-y-2">
+      <div className="text-sm text-gray-300 space-y-1">
         <p>
-          <span className="font-semibold text-purple-300">Ride Type:</span>{' '}
-          {ride.rideType === 'booked' ? 'Booked Ride' : 'Posted Ride'}
+          <strong>Date:</strong> {new Date(ride.date).toLocaleDateString()}
         </p>
         <p>
-          <span className="font-semibold text-purple-300">Ride Owner:</span>{' '}
-          {ride.driver?.name}
-        </p>
-
-        <p>
-          <span className="font-semibold text-purple-300">From:</span> {ride.from}
+          <strong>Time:</strong> {new Date(ride.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
         <p>
-          <span className="font-semibold text-purple-300">To:</span> {ride.to}
+          <strong>Passengers:</strong> {ride.passengers?.length || 0}
         </p>
         <p>
-          <span className="font-semibold text-purple-300">Fare:</span> ₹{ride.costPerPerson}
+          <strong>Status:</strong>{' '}
+          <span className="capitalize">{ride.status || (new Date(ride.date) < new Date() ? 'completed' : 'pending')}</span>
         </p>
       </div>
-
-      {!isBooked && ride.bookedBy?.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-white/20">
-          <p className="font-semibold text-purple-300 mb-2">
-            Passengers ({ride.bookedBy.length}):
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {ride.bookedBy.map((user) => (
-              <span
-                key={user._id}
-                className="bg-green-500/20 text-green-300 px-3 py-1 rounded-lg text-sm"
-              >
-                {user.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {ride.completedAt && (
-        <div className="mt-3 pt-3 border-t border-white/20">
-          <p className="text-sm text-gray-400">
-            <span className="font-semibold text-purple-300">Completed:</span>{' '}
-            {new Date(ride.completedAt).toLocaleString()}
-          </p>
-        </div>
-      )}
     </div>
   );
 };
@@ -98,7 +51,10 @@ const HistoryPage = () => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
 
         const historyRes = await axios.get('/api/rides/history', config);
-        const allRides = historyRes.data || [];
+
+        const allRides = Array.isArray(historyRes.data)
+          ? historyRes.data
+          : historyRes.data.rides || [];
 
         setRideHistory(allRides);
       } catch (error) {
@@ -147,16 +103,18 @@ const HistoryPage = () => {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const historyRes = await axios.get('/api/rides/history', config);
-      setRideHistory(historyRes.data || []);
+      const rides = Array.isArray(historyRes.data)
+        ? historyRes.data
+        : historyRes.data.rides || [];
+      setRideHistory(rides);
     } catch (error) {
       console.error('Error refreshing ride history:', error);
       setError(error.response?.data?.message || 'Failed to refresh ride history');
     }
   };
 
-  const uniqueRides = Array.from(
-    new Map(rideHistory.map((ride) => [ride._id, ride])).values()
-  );
+  const safeRideHistory = Array.isArray(rideHistory) ? rideHistory : [];
+  const uniqueRides = Array.from(new Map(safeRideHistory.map((ride) => [ride._id, ride])).values());
 
   return (
     <div className="min-h-screen p-8 bg-gradient-to-b from-black via-gray-900 to-gray-800 text-white">
@@ -178,7 +136,7 @@ const HistoryPage = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
             <p className="ml-4 text-gray-300">Loading ride history...</p>
           </div>
-        ) : rideHistory.length === 0 ? (
+        ) : safeRideHistory.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">🚗</div>
             <p className="text-xl text-gray-400">No ride history found.</p>
@@ -197,26 +155,27 @@ const HistoryPage = () => {
             <div className="mb-6 flex flex-wrap gap-4 text-sm">
               <div className="bg-white/5 rounded-lg px-4 py-2">
                 <span className="text-gray-400">Total Rides:</span>
-                <span className="ml-2 font-bold text-white">{rideHistory.length}</span>
+                <span className="ml-2 font-bold text-white">{safeRideHistory.length}</span>
               </div>
               <div className="bg-white/5 rounded-lg px-4 py-2">
                 <span className="text-gray-400">Booked:</span>
                 <span className="ml-2 font-bold text-blue-300">
-                  {rideHistory.filter((ride) => ride.rideType === 'booked').length}
+                  {safeRideHistory.filter((ride) => ride.rideType === 'booked').length}
                 </span>
               </div>
               <div className="bg-white/5 rounded-lg px-4 py-2">
                 <span className="text-gray-400">Posted:</span>
                 <span className="ml-2 font-bold text-green-300">
-                  {rideHistory.filter((ride) => ride.rideType === 'posted').length}
+                  {safeRideHistory.filter((ride) => ride.rideType === 'posted').length}
                 </span>
               </div>
               <div className="bg-white/5 rounded-lg px-4 py-2">
                 <span className="text-gray-400">Completed:</span>
                 <span className="ml-2 font-bold text-gray-300">
                   {
-                    rideHistory.filter(
-                      (ride) => ride.status === 'completed' || new Date(ride.date) < new Date()
+                    safeRideHistory.filter(
+                      (ride) =>
+                        ride.status === 'completed' || new Date(ride.date) < new Date()
                     ).length
                   }
                 </span>
