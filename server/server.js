@@ -31,7 +31,13 @@ const app = express();
 const server = http.createServer(app);
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 };
 
