@@ -23,9 +23,7 @@ requiredEnv.forEach((env) => {
   }
 });
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173'];
+const allowedOrigins = process.env.ALLOWED_ORIGINS.split(',')
 
 const app = express();
 const server = http.createServer(app);
