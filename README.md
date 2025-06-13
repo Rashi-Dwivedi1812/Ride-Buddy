@@ -108,7 +108,7 @@ ALLOWED_ORIGINS=http://localhost:5173,https://your-frontend.vercel.app
 ### Frontend 
 ```bash
 cd client
-npm instant
+npm install
 npm run dev
 ```
 
