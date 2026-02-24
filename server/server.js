@@ -23,23 +23,28 @@ requiredEnv.forEach((env) => {
   }
 });
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS.split(',')
-
 const app = express();
 const server = http.createServer(app);
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [];
 
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      console.log("Blocked by CORS:", origin);
+      callback(null, false);   // 🔥 DO NOT throw error
     }
   },
   credentials: true,
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));  // 🔥 handle preflight
+
 app.use(express.json());
 app.use('/api/upload', uploadRoutes);
 app.use('/uploads', express.static(path.resolve('uploads')));
