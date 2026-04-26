@@ -8,6 +8,7 @@ RIDE BUDDY is a real-time ride-sharing web app tailored for college students. Wh
 
 - **Frontend**: [ride-buddy-indol.vercel.app](https://ride-buddy-indol.vercel.app)
 - **Backend API**: [ride-buddy-f1xh.onrender.com](https://ride-buddy-f1xh.onrender.com)
+- **GCP Backend Deploment**: [ride-backend.asia-south1.run.app](https://ride-backend-62850922236.asia-south1.run.app)
 
 ---
 
