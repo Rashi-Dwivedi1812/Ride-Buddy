@@ -8,7 +8,7 @@ RIDE BUDDY is a real-time ride-sharing web app tailored for college students. Wh
 
 - **Frontend**: [ride-buddy-indol.vercel.app](https://ride-buddy-indol.vercel.app)
 - **Backend API**: [ride-buddy-f1xh.onrender.com](https://ride-buddy-f1xh.onrender.com)
-- **GCP Backend Deploment**: [ride-backend.asia-south1.run.app](https://ride-backend-62850922236.asia-south1.run.app)
+- **Backend (Google Cloud Run)**: [ride-backend.asia-south1.run.app](https://ride-backend-62850922236.asia-south1.run.app)
 
 ---
 
@@ -63,17 +63,28 @@ RIDE BUDDY is a real-time ride-sharing web app tailored for college students. Wh
 
 ## ⚙️ Tech Stack
 
-| Part         | Tech                              |
-|--------------|-----------------------------------|
-| Frontend     | React + Tailwind CSS              |
-| Backend      | Node.js + Express.js              |
-| Database     | MongoDB (Mongoose)                |
-| Auth         | JWT + College Email Verification  |
-| Realtime Chat| Socket.IO                         |
-| Image Upload | Cloudinary                        |
-| Hosting      | Vercel (Frontend), Render (Backend) |
+| Part               | Tech                              |
+|--------------------|----------------------------------|
+| Frontend           | React + Tailwind CSS              |
+| Backend            | Node.js + Express.js              |
+| Database           | MongoDB (Mongoose)                |
+| Auth               | JWT                               |
+| Realtime Chat      | Socket.IO                         |
+| Image Upload       | Cloudinary                        |
+| Frontend Hosting   | Vercel                            |
+| Backend Hosting    | Google Cloud Run                  |
 
 ---
+
+## ☁️ Cloud Architecture
+Frontend deployed on Vercel (CDN-based hosting)
+Backend deployed on Google Cloud Run (containerized service)
+Database hosted on MongoDB Atlas (cloud database)
+Communication via:
+REST APIs
+WebSockets (Socket.IO)
+
+--- 
 
 ## 🧠 Future Improvements
 
